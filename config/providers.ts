@@ -3,10 +3,10 @@
  * 
  * 如何添加新的模型提供商:
  * 1. 在 .env 文件中添加配置：
- *    - PROVIDER_XXX_ENABLED=true
- *    - PROVIDER_XXX_BASE_URL=https://api.xxx.com
- *    - PROVIDER_XXX_API_KEY=your-api-key
- *    - PROVIDER_XXX_MODELS=model-id=显示名称<capabilities>,...
+ *    - XXX_ENABLED=true
+ *    - XXX_BASE_URL=https://api.xxx.com
+ *    - XXX_API_KEY=your-api-key
+ *    - XXX_MODELS=model-id=显示名称<capabilities>,...
  * 
  * 2. capabilities 说明（用尖括号包裹，冒号分隔）:
  *    - fc: 支持函数/工具调用
@@ -17,7 +17,7 @@
  *    - search: 支持内置联网搜索
  * 
  * 3. 示例:
- *    PROVIDER_OPENAI_MODELS=gpt-4o=GPT-4o<fc:vision>,gpt-4o-mini=GPT-4o Mini<fc:vision>
+ *    OPENAI_MODELS=gpt-4o=GPT-4o<fc:vision>,gpt-4o-mini=GPT-4o Mini<fc:vision>
  */
 
 import { ModelCapabilities, ModelConfig, ProviderConfig } from "@/types";
@@ -106,37 +106,37 @@ const PROVIDER_CONFIGS: ProviderEnvConfig[] = [
     id: "openai",
     name: "OpenAI",
     icon: "/icons/openai.svg",
-    envPrefix: "PROVIDER_OPENAI",
+    envPrefix: "OPENAI",
   },
   {
     id: "google",
     name: "Google",
     icon: "/icons/google.svg",
-    envPrefix: "PROVIDER_GOOGLE",
+    envPrefix: "GOOGLE",
   },
   {
     id: "anthropic",
     name: "Anthropic",
     icon: "/icons/anthropic.svg",
-    envPrefix: "PROVIDER_ANTHROPIC",
+    envPrefix: "ANTHROPIC",
   },
   {
     id: "deepseek",
     name: "DeepSeek",
     icon: "/icons/deepseek.svg",
-    envPrefix: "PROVIDER_DEEPSEEK",
+    envPrefix: "DEEPSEEK",
   },
   {
     id: "qwen",
     name: "Qwen",
     icon: "/icons/qwen.svg",
-    envPrefix: "PROVIDER_QWEN",
+    envPrefix: "QWEN",
   },
   {
     id: "cloudflare",
     name: "Cloudflare Workers AI",
     icon: "/icons/cloudflare.svg",
-    envPrefix: "PROVIDER_CLOUDFLARE",
+    envPrefix: "CLOUDFLARE",
   },
 ];
 
