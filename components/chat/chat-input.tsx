@@ -29,6 +29,8 @@ import {
   Plus,
   X,
   Loader2,
+  Square,
+  Globe,
 } from "lucide-react";
 import { ModelSelector } from "./model-selector";
 import { ToolSelector } from "./tool-selector";
@@ -91,6 +93,12 @@ interface ChatInputProps {
   isLoading?: boolean;
   /** 是否禁用 */
   disabled?: boolean;
+  /** 停止响应回调 */
+  onStop?: () => void;
+  /** 联网搜索是否启用 */
+  searchEnabled?: boolean;
+  /** 切换联网搜索 */
+  onToggleSearch?: () => void;
 }
 
 /**
@@ -113,6 +121,9 @@ export const ChatInput = memo(function ChatInput({
   onSelectRole,
   isLoading,
   disabled,
+  onStop,
+  searchEnabled,
+  onToggleSearch,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -319,14 +330,33 @@ export const ChatInput = memo(function ChatInput({
           </>
         )}
 
-        {/* 工具选择器（如果支持） */}
-        {capabilities.functionCall && (
+        {/* 工具选择器（如果支持且工具列表不为空） */}
+        {capabilities.functionCall && tools.length > 0 && (
           <ToolSelector
             tools={tools}
             enabledTools={enabledTools}
             onToggle={onToggleTool}
             disabled={disabled}
           />
+        )}
+
+        {/* 联网搜索（如果模型支持） */}
+        {capabilities.search && onToggleSearch && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={searchEnabled ? "default" : "ghost"}
+                  size="icon"
+                  onClick={onToggleSearch}
+                  disabled={disabled}
+                >
+                  <Globe className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>联网搜索</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
 
         {/* 分隔符 */}
@@ -448,12 +478,13 @@ export const ChatInput = memo(function ChatInput({
             disabled={disabled}
           />
           <Button
-            onClick={handleSend}
-            disabled={(!input.trim() && attachments.length === 0) || isLoading || disabled}
+            onClick={isLoading ? onStop : handleSend}
+            disabled={(!input.trim() && attachments.length === 0 && !isLoading) || disabled}
             className="h-[44px] px-4"
+            variant={isLoading ? "destructive" : "default"}
           >
             {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Square className="h-5 w-5" />
             ) : (
               <Send className="h-5 w-5" />
             )}

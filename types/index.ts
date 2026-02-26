@@ -101,6 +101,8 @@ export interface ModelCapabilities {
   imageOutput?: boolean;
   /** 支持联网搜索 */
   search?: boolean;
+  /** 支持语音生成 */
+  tts?: boolean;
 }
 
 /**

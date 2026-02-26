@@ -8,7 +8,7 @@
 const CACHE_VERSION = 'v' + Date.now();
 const CACHE_NAME = `chat-cache-${CACHE_VERSION}`;
 
-// 需要缓存的静态资源路径
+// 需要预缓存的静态资源路径
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -18,31 +18,37 @@ const STATIC_ASSETS = [
   '/icons/deepseek.svg',
   '/icons/qwen.svg',
   '/icons/cloudflare.svg',
-  '/icons/web-search.svg',
 ];
 
-// 需要缓存的资源类型
-const CACHEABLE_TYPES = [
-  'text/html',
-  'text/css',
-  'text/javascript',
-  'application/javascript',
-  'application/json',
-  'image/svg+xml',
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/gif',
-  'font/woff',
-  'font/woff2',
-  'application/font-woff',
-  'application/font-woff2',
+// 需要缓存的文件扩展名
+const CACHEABLE_EXTENSIONS = [
+  '.js',
+  '.css',
+  '.json',
+  '.svg',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.gif',
+  '.ico',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+];
+
+// 需要缓存的路径前缀
+const CACHEABLE_PATHS = [
+  '/_next/static/',
+  '/icons/',
 ];
 
 // 不缓存的路径模式
 const NO_CACHE_PATTERNS = [
   /^\/api\//,  // API 请求不缓存
   /\/_next\/webpack-hmr/,  // HMR 不缓存
+  /\/_next\/data\//,  // 动态数据不缓存
 ];
 
 /**
@@ -63,7 +69,26 @@ function shouldCache(request) {
     }
   }
   
-  return true;
+  // 检查是否是可缓存的路径前缀
+  for (const prefix of CACHEABLE_PATHS) {
+    if (url.pathname.startsWith(prefix)) {
+      return true;
+    }
+  }
+  
+  // 检查是否是可缓存的文件扩展名
+  for (const ext of CACHEABLE_EXTENSIONS) {
+    if (url.pathname.endsWith(ext)) {
+      return true;
+    }
+  }
+  
+  // 主页面也缓存
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -144,7 +169,7 @@ self.addEventListener('fetch', (event) => {
       return fetch(event.request)
         .then((networkResponse) => {
           // 检查响应是否有效
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          if (!networkResponse || networkResponse.status !== 200) {
             return networkResponse;
           }
           

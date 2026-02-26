@@ -9,16 +9,6 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
- * 多语言文本
- */
-const i18n = {
-  role: {
-    zh: "角色",
-    en: "Role",
-  },
-};
-
-/**
  * 获取当前语言
  */
 function getLanguage(): "zh" | "en" {
@@ -45,7 +35,31 @@ interface ChatHeaderProps {
   onOpenSidebar?: () => void;
   /** 是否为移动端 */
   isMobile?: boolean;
+  /** 提供商图标 */
+  providerIcon?: string;
+  /** 是否启用推理模式 */
+  reasoningEnabled?: boolean;
+  /** 是否启用联网搜索 */
+  searchEnabled?: boolean;
 }
+
+/**
+ * 多语言文本
+ */
+const i18n = {
+  role: {
+    zh: "角色",
+    en: "Role",
+  },
+  reasoning: {
+    zh: "推理模式",
+    en: "Reasoning",
+  },
+  search: {
+    zh: "联网搜索",
+    en: "Web Search",
+  },
+};
 
 /**
  * 对话头部组件
@@ -58,6 +72,9 @@ export const ChatHeader = memo(function ChatHeader({
   messageCount,
   onOpenSidebar,
   isMobile,
+  providerIcon,
+  reasoningEnabled,
+  searchEnabled,
 }: ChatHeaderProps) {
   const lang = getLanguage();
   
@@ -82,12 +99,32 @@ export const ChatHeader = memo(function ChatHeader({
             )}
           </h1>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {/* 模型名称 */}
+            {/* 模型名称和图标 */}
             {modelName && (
               <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                {providerIcon ? (
+                  <img src={providerIcon} alt="" className="w-3.5 h-3.5" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                )}
                 {modelName}
               </span>
+            )}
+
+            {/* 推理模式 */}
+            {reasoningEnabled && (
+              <>
+                <span>·</span>
+                <span className="text-primary">{i18n.reasoning[lang]}</span>
+              </>
+            )}
+
+            {/* 联网搜索 */}
+            {searchEnabled && (
+              <>
+                <span>·</span>
+                <span className="text-primary">{i18n.search[lang]}</span>
+              </>
             )}
 
             {/* 角色名称 */}

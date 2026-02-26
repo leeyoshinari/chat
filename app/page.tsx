@@ -4,7 +4,7 @@
  */
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useChatStore } from "@/store/chat-store";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ChatHeader } from "@/components/chat/chat-header";
@@ -79,6 +79,10 @@ export default function HomePage() {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [searchEnabled, setSearchEnabled] = useState(false);
+  
+  // AbortController 用于停止响应
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 检测移动端
   useEffect(() => {
@@ -131,8 +135,9 @@ export default function HomePage() {
         // 加载会话
         await loadSessions();
 
-        // 设置默认模型
-        if (!selectedModelId && configData.providers.length > 0) {
+        // 设置默认模型（只有当没有保存的模型时才设置）
+        const persistedState = useChatStore.getState();
+        if (!persistedState.selectedModelId && configData.providers.length > 0) {
           const firstProvider = configData.providers[0];
           if (firstProvider.models.length > 0) {
             const firstModel = firstProvider.models[0];
@@ -159,6 +164,12 @@ export default function HomePage() {
     const provider = config.providers.find((p) => p.id === selectedProviderId);
     return provider?.models.find((m) => m.id === selectedModelId);
   }, [config, selectedModelId, selectedProviderId]);
+
+  // 获取当前提供商信息
+  const currentProvider = useMemo(() => {
+    if (!config || !selectedProviderId) return null;
+    return config.providers.find((p) => p.id === selectedProviderId);
+  }, [config, selectedProviderId]);
 
   // 获取当前角色
   const currentRole = useMemo(() => {
@@ -253,6 +264,10 @@ export default function HomePage() {
       setLoading(true);
       setStreamingMessageId(assistantMessageId);
 
+      // 创建 AbortController
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       try {
         // 准备消息历史
         const historyLimit = config?.historyLimit || 50;
@@ -297,8 +312,10 @@ export default function HomePage() {
             stream: true,
             reasoning: reasoningEnabled,
             tools: enabledTools,
+            search: searchEnabled,
             password: useChatStore.getState().accessPassword,
           }),
+          signal: abortController.signal,
         });
 
         if (!response.ok) {
@@ -363,6 +380,11 @@ export default function HomePage() {
           isStreaming: false,
         });
       } catch (error) {
+        // 如果是用户主动取消，不显示错误
+        if (error instanceof Error && error.name === 'AbortError') {
+          // 保留已生成的内容
+          return;
+        }
         console.error("Chat error:", error);
         toast.error(error instanceof Error ? error.message : "发送失败");
         // 删除失败的消息
@@ -370,6 +392,7 @@ export default function HomePage() {
       } finally {
         setLoading(false);
         setStreamingMessageId(null);
+        abortControllerRef.current = null;
       }
     },
     [
@@ -382,12 +405,25 @@ export default function HomePage() {
       renameSession,
       reasoningEnabled,
       enabledTools,
+      searchEnabled,
       addMessage,
       updateMessage,
       deleteMessage,
       setLoading,
     ]
   );
+
+  // 停止响应
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  // 切换联网搜索
+  const handleToggleSearch = useCallback(() => {
+    setSearchEnabled((prev) => !prev);
+  }, []);
 
   // 重新生成消息
   const handleRegenerate = useCallback(
@@ -486,10 +522,10 @@ export default function HomePage() {
         </aside>
       )}
 
-      {/* 移动端侧边栏抽屉 */}
+      {/* 移动端侧边栏抽屉 - 从底部弹出 */}
       {isMobile && (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-80">
+          <SheetContent side="bottom" className="p-0 h-[80vh] rounded-t-xl">
             <Sidebar
               sessions={sessions}
               currentSessionId={currentSessionId}
@@ -510,12 +546,15 @@ export default function HomePage() {
           title={currentSession?.title || "新对话"}
           modelName={currentModel?.name}
           roleName={currentRole?.name}
+          providerIcon={currentProvider?.icon}
           toolNames={enabledTools.map(
             (id) => config.tools.find((t) => t.id === id)?.name || id
           )}
           messageCount={messages.length}
           onOpenSidebar={() => setSidebarOpen(true)}
           isMobile={isMobile}
+          reasoningEnabled={reasoningEnabled}
+          searchEnabled={searchEnabled}
         />
 
         {/* 消息列表 */}
@@ -534,7 +573,7 @@ export default function HomePage() {
           selectedModelId={selectedModelId}
           selectedProviderId={selectedProviderId}
           onSelectModel={setSelectedModel}
-          tools={config.tools}
+          tools={config.tools.filter((t) => t.id !== "web-search")}
           enabledTools={enabledTools}
           onToggleTool={toggleTool}
           reasoningEnabled={reasoningEnabled}
@@ -544,6 +583,9 @@ export default function HomePage() {
           roles={roles}
           onSelectRole={handleSelectRole}
           isLoading={isLoading}
+          onStop={handleStop}
+          searchEnabled={searchEnabled}
+          onToggleSearch={currentModel?.capabilities?.search ? handleToggleSearch : undefined}
         />
       </main>
     </div>

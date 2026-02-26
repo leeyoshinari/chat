@@ -5,18 +5,29 @@
 import { BaseAdapter, AdapterRequest, AdapterResponse, StreamChunk } from "./base";
 import { toOpenAITools } from "@/config/tools";
 
+// Google Gemini API 默认基础 URL
+const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
 /**
  * Google Gemini 适配器
  */
 export class GeminiAdapter extends BaseAdapter {
+  /**
+   * 获取基础 URL
+   */
+  private getBaseUrl(request: AdapterRequest): string {
+    return request.baseUrl || DEFAULT_GEMINI_BASE_URL;
+  }
+
   /**
    * 非流式对话
    */
   async chat(request: AdapterRequest): Promise<AdapterResponse> {
     const contents = this.formatMessages(request);
     const tools = request.tools ? this.formatTools(request.tools) : undefined;
+    const baseUrl = this.getBaseUrl(request);
 
-    const url = `${request.baseUrl}/models/${request.model}:generateContent?key=${request.apiKey}`;
+    const url = `${baseUrl}/models/${request.model}:generateContent?key=${request.apiKey}`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -76,8 +87,9 @@ export class GeminiAdapter extends BaseAdapter {
   async *chatStream(request: AdapterRequest): AsyncGenerator<StreamChunk> {
     const contents = this.formatMessages(request);
     const tools = request.tools ? this.formatTools(request.tools) : undefined;
+    const baseUrl = this.getBaseUrl(request);
 
-    const url = `${request.baseUrl}/models/${request.model}:streamGenerateContent?key=${request.apiKey}&alt=sse`;
+    const url = `${baseUrl}/models/${request.model}:streamGenerateContent?key=${request.apiKey}&alt=sse`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -140,6 +152,14 @@ export class GeminiAdapter extends BaseAdapter {
                       name: part.functionCall.name,
                       arguments: part.functionCall.args,
                     },
+                  };
+                }
+                // TTS 音频支持
+                if (part.inlineData?.mimeType?.startsWith("audio/")) {
+                  yield {
+                    type: "audio",
+                    content: part.inlineData.data,
+                    mimeType: part.inlineData.mimeType,
                   };
                 }
               }

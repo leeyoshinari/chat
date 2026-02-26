@@ -29,6 +29,7 @@ import {
   Search,
   Image,
   Bot,
+  Volume2,
 } from "lucide-react";
 
 /**
@@ -44,6 +45,7 @@ const CapabilityIcons: Record<
   functionCall: { icon: <Wrench className="h-3 w-3" />, label: "工具调用" },
   search: { icon: <Search className="h-3 w-3" />, label: "联网搜索" },
   imageOutput: { icon: <Image className="h-3 w-3" />, label: "图片生成" },
+  tts: { icon: <Volume2 className="h-3 w-3" />, label: "语音生成" },
 };
 
 /**
@@ -157,7 +159,7 @@ export const ModelSelector = memo(function ModelSelector({
         </Tooltip>
       </TooltipProvider>
 
-      <PopoverContent className="w-80 p-0" align="start">
+      <PopoverContent className="w-auto min-w-[320px] max-w-[400px] p-0" align="start">
         <ScrollArea className="h-[400px]">
           <div className="p-2">
             {providers.map((provider) => (
@@ -189,11 +191,11 @@ export const ModelSelector = memo(function ModelSelector({
                         setOpen(false);
                       }}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
                         <img
                           src={provider.icon}
                           alt={provider.name}
-                          className="h-4 w-4"
+                          className="h-4 w-4 flex-shrink-0"
                         />
                         <span>{model.name}</span>
                       </div>

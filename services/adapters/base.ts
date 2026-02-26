@@ -78,13 +78,15 @@ export interface AdapterResponse {
  */
 export interface StreamChunk {
   /** 类型 */
-  type: "text" | "thinking" | "tool_call" | "tool_result" | "image" | "done" | "error";
+  type: "text" | "thinking" | "tool_call" | "tool_result" | "image" | "audio" | "done" | "error";
   /** 内容 */
   content?: string;
   /** 工具调用 */
   toolCall?: Partial<ToolCall>;
   /** 图片 URL */
   imageUrl?: string;
+  /** 音频 MIME 类型 */
+  mimeType?: string;
   /** 错误信息 */
   error?: string;
 }

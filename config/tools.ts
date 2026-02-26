@@ -22,28 +22,6 @@ import { ToolDefinition } from "@/types";
  */
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
-    id: "web_search",
-    name: "Web Search",
-    description:
-      "Search the web for information. Use this when you need to find current information, news, or facts that may not be in your training data.",
-    icon: "/icons/tools/search.svg",
-    builtin: true,
-    parameters: [
-      {
-        name: "query",
-        type: "string",
-        description: "The search query",
-        required: true,
-      },
-      {
-        name: "num_results",
-        type: "number",
-        description: "Number of results to return (default: 5)",
-        required: false,
-      },
-    ],
-  },
-  {
     id: "code_interpreter",
     name: "Code Interpreter",
     description:
