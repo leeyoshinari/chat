@@ -87,8 +87,8 @@ interface ChatInputProps {
   onNewChat: () => void;
   /** 角色列表 */
   roles: Role[];
-  /** 选择角色回调 */
-  onSelectRole: (roleId: string) => void;
+  /** 选择角色回调，返回 systemPrompt */
+  onSelectRole: (roleId: string) => string | undefined;
   /** 是否正在加载 */
   isLoading?: boolean;
   /** 是否禁用 */
@@ -238,13 +238,16 @@ export const ChatInput = memo(function ChatInput({
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
-  // 选择角色
+  // 选择角色 - 将 systemPrompt 填充到输入框
   const handleSelectRole = useCallback(
     (roleId: string) => {
-      onSelectRole(roleId);
-      setInput("");
+      const prompt = onSelectRole(roleId);
+      if (prompt) {
+        setInput(prompt);
+      }
       setShowRoles(false);
       setRoleFilter("");
+      textareaRef.current?.focus();
     },
     [onSelectRole]
   );

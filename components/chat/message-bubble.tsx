@@ -4,7 +4,7 @@
  */
 "use client";
 
-import React, { memo, useState } from "react";
+import React, { memo, useState, useCallback, useRef } from "react";
 import { Message, MessageContentItem, SearchResults } from "@/types";
 import { cn, copyToClipboard, formatDate } from "@/lib/utils";
 import { Markdown } from "./markdown";
@@ -19,6 +19,9 @@ import {
   Bot,
   Globe,
   ExternalLink,
+  Play,
+  Pause,
+  Volume2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -33,42 +36,54 @@ interface MessageBubbleProps {
 }
 
 /**
- * 将 PCM L16 data URL 转换为 WAV Blob URL
+ * 将 PCM L16 raw data URL 转换为 WAV data URL
  */
-function pcmToWavBlobUrl(dataUrl: string): string {
-  const base64 = dataUrl.split(",")[1];
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const pcmData = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    pcmData[i] = binaryString.charCodeAt(i);
+function pcmToWavDataUrl(rawDataUrl: string): string {
+  const pcmBase64 = rawDataUrl.split(",")[1];
+  const pcmBinary = atob(pcmBase64);
+  const pcmUint8 = new Uint8Array(pcmBinary.length);
+  for (let i = 0; i < pcmBinary.length; i++) {
+    pcmUint8[i] = pcmBinary.charCodeAt(i);
   }
 
-  // 构建 WAV 文件头 (44 字节)
-  const wavHeader = new ArrayBuffer(44);
-  const view = new DataView(wavHeader);
+  // 生成 44 字节的 WAV Header
+  const header = new ArrayBuffer(44);
+  const v = new DataView(header);
+  v.setUint32(0, 0x52494646, false);
+  v.setUint32(4, 36 + pcmUint8.length, true);
+  v.setUint32(8, 0x57415645, false);
+  v.setUint32(12, 0x666d7420, false);
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, 24000, true);
+  v.setUint32(28, 48000, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  v.setUint32(36, 0x64617461, false);
+  v.setUint32(40, pcmUint8.length, true);
 
-  view.setUint32(0, 0x52494646, false); // "RIFF"
-  view.setUint32(4, 36 + len, true);    // 文件总长度 - 8
-  view.setUint32(8, 0x57415645, false); // "WAVE"
-  view.setUint32(12, 0x666d7420, false); // "fmt "
-  view.setUint32(16, 16, true);          // 块长度
-  view.setUint16(20, 1, true);           // PCM 格式
-  view.setUint16(22, 1, true);           // 单声道
-  view.setUint32(24, 24000, true);       // 采样率 24000Hz
-  view.setUint32(28, 24000 * 2, true);   // 每秒字节数
-  view.setUint16(32, 2, true);           // 区块对齐
-  view.setUint16(34, 16, true);          // 位深 16-bit
-  view.setUint32(36, 0x64617461, false); // "data"
-  view.setUint32(40, len, true);         // 数据长度
+  // 合并 Header 和 PCM 数据
+  const fullWav = new Uint8Array(44 + pcmUint8.length);
+  fullWav.set(new Uint8Array(header), 0);
+  fullWav.set(pcmUint8, 44);
 
-  const blob = new Blob([wavHeader, pcmData], { type: "audio/wav" });
-  return URL.createObjectURL(blob);
+  // 分块转 Base64，避免 btoa 溢出
+  const chunkSize = 8192;
+  let base64Audio = "";
+  for (let i = 0; i < fullWav.length; i += chunkSize) {
+    const chunk = fullWav.subarray(i, i + chunkSize);
+    base64Audio += String.fromCharCode(...chunk);
+  }
+  base64Audio = btoa(base64Audio);
+
+  return `data:audio/wav;base64,${base64Audio}`;
 }
 
 /**
  * 音频播放器组件
- * 支持 PCM L16 (Gemini TTS) 和常规音频格式
+ * 展示播放按钮，点击播放/暂停音频
+ * 支持 PCM L16 (Gemini TTS) 和常规音频
  */
 const AudioPlayer = memo(function AudioPlayer({
   url,
@@ -77,49 +92,48 @@ const AudioPlayer = memo(function AudioPlayer({
   url: string;
   mimeType: string;
 }) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  React.useEffect(() => {
-    if (!url) return;
-
-    if (url.startsWith("data:")) {
-      try {
-        // 检测是否为 PCM L16 格式 (Gemini TTS 返回)
-        const isPCM = url.includes("audio/L16") || url.includes("codec=pcm");
-
-        if (isPCM) {
-          const wavUrl = pcmToWavBlobUrl(url);
-          setBlobUrl(wavUrl);
-          return () => URL.revokeObjectURL(wavUrl);
-        }
-
-        // 其他 data URL -> Blob URL
-        const [meta, base64Data] = url.split(",");
-        const detectedMime = meta.match(/data:(.*?)[;,]/)?.[1] || mimeType;
-        const byteChars = atob(base64Data);
-        const byteArray = new Uint8Array(byteChars.length);
-        for (let i = 0; i < byteChars.length; i++) {
-          byteArray[i] = byteChars.charCodeAt(i);
-        }
-        const blob = new Blob([byteArray], { type: detectedMime });
-        const objectUrl = URL.createObjectURL(blob);
-        setBlobUrl(objectUrl);
-        return () => URL.revokeObjectURL(objectUrl);
-      } catch {
-        setBlobUrl(url);
-      }
-    } else {
-      setBlobUrl(url);
+  const handleToggle = useCallback(() => {
+    if (!audioRef.current) {
+      const audio = new Audio();
+      // PCM L16 需要转换为 WAV
+      const isPCM = url.includes("audio/L16") || url.includes("codec=pcm");
+      audio.src = isPCM ? pcmToWavDataUrl(url) : url;
+      audio.onended = () => setIsPlaying(false);
+      audio.onerror = () => setIsPlaying(false);
+      audioRef.current = audio;
     }
-  }, [url, mimeType]);
 
-  if (!blobUrl) return null;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => setIsPlaying(false));
+      setIsPlaying(true);
+    }
+  }, [url, isPlaying]);
 
   return (
-    <audio controls className="w-full max-w-md">
-      <source src={blobUrl} type="audio/wav" />
-      Your browser does not support the audio element.
-    </audio>
+    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+      <Button
+        variant="default"
+        size="icon"
+        className="h-10 w-10 rounded-full flex-shrink-0"
+        onClick={handleToggle}
+      >
+        {isPlaying ? (
+          <Pause className="h-5 w-5" />
+        ) : (
+          <Play className="h-5 w-5 ml-0.5" />
+        )}
+      </Button>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Volume2 className="h-4 w-4" />
+        <span>{isPlaying ? "Playing..." : "Audio"}</span>
+      </div>
+    </div>
   );
 });
 

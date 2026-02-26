@@ -1,9 +1,3 @@
-/**
- * Service Worker
- * 缓存所有静态文件以节省流量
- * 版本号在构建时自动更新
- */
-
 // 缓存版本号 - 每次构建时会自动更新
 const CACHE_VERSION = 'v' + Date.now();
 const CACHE_NAME = `chat-cache-${CACHE_VERSION}`;

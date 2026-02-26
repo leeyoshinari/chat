@@ -53,7 +53,6 @@ export default function HomePage() {
     enabledTools,
     isAuthenticated,
     sidebarOpen,
-    currentRoleId,
     loadSessions,
     createSession,
     switchSession,
@@ -69,7 +68,6 @@ export default function HomePage() {
     toggleTool,
     setLoading,
     setSidebarOpen,
-    setCurrentRole,
     authenticate,
     setAccessPassword,
   } = useChatStore();
@@ -181,11 +179,6 @@ export default function HomePage() {
     return config.providers.find((p) => p.id === selectedProviderId);
   }, [config, selectedProviderId]);
 
-  // 获取当前角色
-  const currentRole = useMemo(() => {
-    return roles.find((r) => r.id === currentRoleId);
-  }, [roles, currentRoleId]);
-
   // 处理密码验证
   const handlePasswordSubmit = useCallback(async (password: string) => {
     try {
@@ -271,17 +264,6 @@ export default function HomePage() {
 
         // 构建请求消息
         const requestMessages: any[] = [];
-
-        // 获取当前角色的系统提示词（从最新状态获取）
-        const activeRolePrompt = useChatStore.getState().currentRolePrompt;
-
-        // 添加系统提示词
-        if (activeRolePrompt) {
-          requestMessages.push({
-            role: "system",
-            content: activeRolePrompt,
-          });
-        }
 
         // 添加历史消息
         for (const msg of recentMessages) {
@@ -491,16 +473,13 @@ export default function HomePage() {
     }
   }, [createSession, isMobile, setSidebarOpen]);
 
-  // 处理选择角色
+  // 处理选择角色 - 返回 systemPrompt 给输入框填充
   const handleSelectRole = useCallback(
-    (roleId: string) => {
+    (roleId: string): string | undefined => {
       const role = roles.find((r) => r.id === roleId);
-      if (role) {
-        setCurrentRole(roleId, role.systemPrompt);
-        toast.success(`已切换到角色: ${role.name}`);
-      }
+      return role?.systemPrompt;
     },
-    [roles, setCurrentRole]
+    [roles]
   );
 
   // 如果需要密码且未验证，显示密码对话框
@@ -561,7 +540,6 @@ export default function HomePage() {
         <ChatHeader
           title={currentSession?.title || "新对话"}
           modelName={currentModel?.name}
-          roleName={currentRole?.name}
           providerIcon={currentProvider?.icon}
           toolNames={enabledTools.map(
             (id) => config.tools.find((t) => t.id === id)?.name || id

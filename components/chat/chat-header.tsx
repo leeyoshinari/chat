@@ -25,8 +25,6 @@ interface ChatHeaderProps {
   title: string;
   /** 模型名称 */
   modelName?: string;
-  /** 角色名称 */
-  roleName?: string;
   /** 工具名称列表 */
   toolNames?: string[];
   /** 消息数量 */
@@ -47,10 +45,6 @@ interface ChatHeaderProps {
  * 多语言文本
  */
 const i18n = {
-  role: {
-    zh: "角色",
-    en: "Role",
-  },
   reasoning: {
     zh: "推理模式",
     en: "Reasoning",
@@ -67,7 +61,6 @@ const i18n = {
 export const ChatHeader = memo(function ChatHeader({
   title,
   modelName,
-  roleName,
   toolNames,
   messageCount,
   onOpenSidebar,
@@ -124,14 +117,6 @@ export const ChatHeader = memo(function ChatHeader({
               <>
                 <span>·</span>
                 <span className="text-primary">{i18n.search[lang]}</span>
-              </>
-            )}
-
-            {/* 角色名称 */}
-            {roleName && (
-              <>
-                <span>·</span>
-                <span>{i18n.role[lang]}: {roleName}</span>
               </>
             )}
 
