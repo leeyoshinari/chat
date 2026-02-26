@@ -154,6 +154,15 @@ export default function HomePage() {
     init();
   }, []);
 
+  // 切换模型时重置推理和搜索状态
+  const handleSelectModel = useCallback(
+    (modelId: string, providerId: string) => {
+      setSelectedModel(modelId, providerId);
+      setSearchEnabled(false);
+    },
+    [setSelectedModel]
+  );
+
   // 获取当前会话信息
   const currentSession = useMemo(() => {
     return sessions.find((s) => s.id === currentSessionId);
@@ -579,7 +588,7 @@ export default function HomePage() {
           providers={config.providers}
           selectedModelId={selectedModelId}
           selectedProviderId={selectedProviderId}
-          onSelectModel={setSelectedModel}
+          onSelectModel={handleSelectModel}
           tools={config.tools.filter((t) => t.id !== "web-search")}
           enabledTools={enabledTools}
           onToggleTool={toggleTool}

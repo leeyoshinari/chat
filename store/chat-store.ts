@@ -327,6 +327,7 @@ export const useChatStore = create<ChatStore>()(
         set({
           selectedModelId: modelId,
           selectedProviderId: providerId,
+          reasoningEnabled: false,
         });
       },
 

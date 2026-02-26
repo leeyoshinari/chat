@@ -33,8 +33,42 @@ interface MessageBubbleProps {
 }
 
 /**
+ * 将 PCM L16 data URL 转换为 WAV Blob URL
+ */
+function pcmToWavBlobUrl(dataUrl: string): string {
+  const base64 = dataUrl.split(",")[1];
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const pcmData = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    pcmData[i] = binaryString.charCodeAt(i);
+  }
+
+  // 构建 WAV 文件头 (44 字节)
+  const wavHeader = new ArrayBuffer(44);
+  const view = new DataView(wavHeader);
+
+  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(4, 36 + len, true);    // 文件总长度 - 8
+  view.setUint32(8, 0x57415645, false); // "WAVE"
+  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(16, 16, true);          // 块长度
+  view.setUint16(20, 1, true);           // PCM 格式
+  view.setUint16(22, 1, true);           // 单声道
+  view.setUint32(24, 24000, true);       // 采样率 24000Hz
+  view.setUint32(28, 24000 * 2, true);   // 每秒字节数
+  view.setUint16(32, 2, true);           // 区块对齐
+  view.setUint16(34, 16, true);          // 位深 16-bit
+  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(40, len, true);         // 数据长度
+
+  const blob = new Blob([wavHeader, pcmData], { type: "audio/wav" });
+  return URL.createObjectURL(blob);
+}
+
+/**
  * 音频播放器组件
- * 将 data URL 转换为 Blob URL 以提升性能
+ * 支持 PCM L16 (Gemini TTS) 和常规音频格式
  */
 const AudioPlayer = memo(function AudioPlayer({
   url,
@@ -48,11 +82,20 @@ const AudioPlayer = memo(function AudioPlayer({
   React.useEffect(() => {
     if (!url) return;
 
-    // data URL -> Blob URL
     if (url.startsWith("data:")) {
       try {
+        // 检测是否为 PCM L16 格式 (Gemini TTS 返回)
+        const isPCM = url.includes("audio/L16") || url.includes("codec=pcm");
+
+        if (isPCM) {
+          const wavUrl = pcmToWavBlobUrl(url);
+          setBlobUrl(wavUrl);
+          return () => URL.revokeObjectURL(wavUrl);
+        }
+
+        // 其他 data URL -> Blob URL
         const [meta, base64Data] = url.split(",");
-        const detectedMime = meta.match(/data:(.*?);/)?.[1] || mimeType;
+        const detectedMime = meta.match(/data:(.*?)[;,]/)?.[1] || mimeType;
         const byteChars = atob(base64Data);
         const byteArray = new Uint8Array(byteChars.length);
         for (let i = 0; i < byteChars.length; i++) {
@@ -63,7 +106,6 @@ const AudioPlayer = memo(function AudioPlayer({
         setBlobUrl(objectUrl);
         return () => URL.revokeObjectURL(objectUrl);
       } catch {
-        // 转换失败，直接使用原始 URL
         setBlobUrl(url);
       }
     } else {
@@ -75,7 +117,7 @@ const AudioPlayer = memo(function AudioPlayer({
 
   return (
     <audio controls className="w-full max-w-md">
-      <source src={blobUrl} type={mimeType} />
+      <source src={blobUrl} type="audio/wav" />
       Your browser does not support the audio element.
     </audio>
   );
