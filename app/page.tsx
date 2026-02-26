@@ -313,6 +313,7 @@ export default function HomePage() {
         let fullContent = "";
         let thinking = "";
         let searchResults: any = null;
+        let audioContent: any = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -343,15 +344,14 @@ export default function HomePage() {
                     searchResults: searchResults || undefined,
                   });
                 } else if (parsed.type === "audio") {
-                  // TTS 音频：content 是 data URL
+                  // TTS 音频：content 是 data URL，mimeType 已在适配器中处理
+                  audioContent = {
+                    type: "audio",
+                    url: parsed.content,
+                    mimeType: parsed.mimeType || "audio/wav",
+                  };
                   await updateMessage(assistantMessageId, {
-                    content: [
-                      {
-                        type: "audio",
-                        url: parsed.content,
-                        mimeType: parsed.mimeType || "audio/mp3",
-                      },
-                    ],
+                    content: [audioContent],
                   });
                 } else if (parsed.type === "search_results") {
                   searchResults = parsed.data;
@@ -370,9 +370,13 @@ export default function HomePage() {
           }
         }
 
-        // 完成流式输出
+        // 完成流式输出 - 保留音频内容，不覆盖
+        const finalContent = audioContent
+          ? [audioContent]
+          : [{ type: "text", text: fullContent }];
+
         await updateMessage(assistantMessageId, {
-          content: [{ type: "text", text: fullContent }],
+          content: finalContent,
           thinking: thinking || undefined,
           searchResults: searchResults || undefined,
           isStreaming: false,

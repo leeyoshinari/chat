@@ -151,8 +151,11 @@ export class GeminiAdapter extends BaseAdapter {
     // 提取 base64 音频数据
     for (const part of parts) {
       if (part.inlineData?.data) {
-        const mimeType = part.inlineData.mimeType || "audio/mp3";
-        const audioDataUrl = `data:${mimeType};base64,${part.inlineData.data}`;
+        const rawMimeType = part.inlineData.mimeType || "";
+        const isPCM = rawMimeType.includes("L16") || rawMimeType.includes("pcm");
+        // PCM 数据保留原始 data URL，前端会转为 WAV；mimeType 统一为 audio/wav
+        const mimeType = isPCM ? "audio/wav" : (rawMimeType || "audio/wav");
+        const audioDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         return {
           content: "",
           audio: { url: audioDataUrl, mimeType },

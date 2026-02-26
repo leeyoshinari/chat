@@ -187,7 +187,7 @@ const MessageContent = memo(function MessageContent({
 
           case "audio":
             return (
-              <AudioPlayer key={index} url={item.url || ""} mimeType={item.mimeType || "audio/mp3"} />
+              <AudioPlayer key={index} url={item.url || ""} mimeType={item.mimeType || "audio/wav"} />
             );
 
           case "video":
