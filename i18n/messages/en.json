@@ -1,0 +1,82 @@
+{
+  "common": {
+    "newChat": "New Chat",
+    "send": "Send",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "rename": "Rename",
+    "copy": "Copy",
+    "copied": "Copied",
+    "regenerate": "Regenerate",
+    "clear": "Clear",
+    "settings": "Settings",
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry"
+  },
+  "chat": {
+    "inputPlaceholder": "Type a message...",
+    "thinking": "Thinking...",
+    "thinkingProcess": "Thinking Process",
+    "toolCalling": "Calling tool: {tool}",
+    "noMessages": "No messages yet",
+    "welcomeTitle": "Good {timeOfDay}",
+    "welcomeMessage": "I'm your AI assistant. How can I help you today?",
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "evening": "Evening"
+  },
+  "sidebar": {
+    "title": "Chats",
+    "searchPlaceholder": "Search chats...",
+    "noChats": "No chats yet",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "thisWeek": "This Week",
+    "older": "Older"
+  },
+  "toolbar": {
+    "selectModel": "Select Model",
+    "reasoning": "Reasoning",
+    "uploadImage": "Upload Image",
+    "uploadFile": "Upload File",
+    "selectTools": "Select Tools",
+    "clearHistory": "Clear History",
+    "newChat": "New Chat"
+  },
+  "model": {
+    "selectModel": "Select Model",
+    "capabilities": {
+      "vision": "Vision",
+      "file": "File",
+      "reasoning": "Reasoning",
+      "functionCall": "Tools",
+      "search": "Search",
+      "imageOutput": "Image Gen"
+    }
+  },
+  "tools": {
+    "title": "Tools",
+    "builtin": "Built-in Tools",
+    "thirdParty": "Third-party Tools",
+    "webSearch": "Web Search",
+    "codeInterpreter": "Code Interpreter"
+  },
+  "auth": {
+    "title": "Enter Password",
+    "placeholder": "Access password",
+    "submit": "Submit",
+    "incorrect": "Incorrect password"
+  },
+  "role": {
+    "selectRole": "Select a role",
+    "searchPlaceholder": "Search roles..."
+  },
+  "errors": {
+    "networkError": "Network error, please try again",
+    "serverError": "Server error, please try again later",
+    "unauthorized": "Unauthorized access",
+    "modelNotFound": "Model not found"
+  }
+}

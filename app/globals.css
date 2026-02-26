@@ -1,0 +1,233 @@
+/**
+ * 全局样式文件
+ * 定义了整个应用的 CSS 变量和基础样式
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* 亮色主题变量 */
+  :root {
+    /* 基础颜色 */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    /* 卡片颜色 */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    /* 弹出层颜色 */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* 主色调 - 蓝色 */
+    --primary: 217 91% 60%;
+    --primary-foreground: 210 40% 98%;
+
+    /* 次要颜色 */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    /* 静音/禁用颜色 */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    /* 强调颜色 */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    /* 危险/删除颜色 */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* 边框和输入框 */
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 217 91% 60%;
+    --radius: 0.75rem;
+
+    /* 用户消息气泡 - 淡蓝色 */
+    --user-message: 213 97% 95%;
+    --user-message-foreground: 222.2 84% 4.9%;
+
+    /* AI 消息 - 透明 */
+    --assistant-message: 0 0% 100%;
+    --assistant-message-foreground: 222.2 84% 4.9%;
+
+    /* 侧边栏 */
+    --sidebar: 0 0% 98%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-hover: 210 40% 96.1%;
+  }
+
+  /* 暗色主题变量 */
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --card: 224 71% 6%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 224 71% 6%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 222 47% 11%;
+    --secondary-foreground: 213 31% 91%;
+
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+
+    --accent: 222 47% 11%;
+    --accent-foreground: 213 31% 91%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 223 47% 15%;
+    --input: 223 47% 15%;
+    --ring: 217 91% 60%;
+
+    /* 用户消息气泡 - 深蓝色 */
+    --user-message: 217 91% 20%;
+    --user-message-foreground: 213 31% 91%;
+
+    /* AI 消息 */
+    --assistant-message: 224 71% 6%;
+    --assistant-message-foreground: 213 31% 91%;
+
+    /* 侧边栏 */
+    --sidebar: 224 71% 6%;
+    --sidebar-foreground: 213 31% 91%;
+    --sidebar-border: 223 47% 15%;
+    --sidebar-hover: 222 47% 11%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* 使用系统字体 */
+    font-feature-settings: "rlig" 1, "calt" 1;
+    /* 平滑滚动 */
+    scroll-behavior: smooth;
+    /* 防止文字选中高亮在移动端 */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 自定义滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+
+  /* Firefox 滚动条 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
+  }
+}
+
+@layer components {
+  /* 消息内容中的代码块样式 */
+  .prose pre {
+    @apply bg-muted rounded-lg p-4 overflow-x-auto;
+  }
+
+  .prose code {
+    @apply bg-muted px-1.5 py-0.5 rounded text-sm;
+  }
+
+  .prose pre code {
+    @apply bg-transparent p-0;
+  }
+
+  /* 消息气泡基础样式 */
+  .message-bubble {
+    @apply max-w-[85%] rounded-2xl px-4 py-3;
+  }
+
+  /* 工具栏按钮 */
+  .toolbar-btn {
+    @apply flex items-center justify-center p-2 rounded-lg transition-colors;
+    @apply hover:bg-accent text-muted-foreground hover:text-foreground;
+  }
+
+  /* 思考过程展开样式 */
+  .thinking-content {
+    @apply bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground;
+    @apply border-l-2 border-primary/50;
+  }
+
+  /* 模型选择器项目 */
+  .model-item {
+    @apply flex items-center gap-3 p-2 rounded-lg cursor-pointer;
+    @apply hover:bg-accent transition-colors;
+  }
+
+  /* 对话列表项 */
+  .session-item {
+    @apply flex items-center gap-2 p-3 rounded-lg cursor-pointer;
+    @apply hover:bg-sidebar-hover transition-colors;
+  }
+
+  .session-item.active {
+    @apply bg-sidebar-hover;
+  }
+}
+
+@layer utilities {
+  /* 隐藏滚动条但保持滚动功能 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 文字省略 */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* 安全区域适配（移动端） */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
