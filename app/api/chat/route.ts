@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // 联网搜索逻辑
     let searchResults: {
       query: string;
-      results: Array<{ title: string; url: string; snippet: string }>;
+      results: Array<{ title: string; url: string; snippet: string; content?: string }>;
       resultCount: number;
     } | null = null;
     let enhancedMessages = messages;
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         if (searchResult.success && searchResult.data) {
           const data = searchResult.data as {
             query: string;
-            results: Array<{ title: string; url: string; snippet: string; content?: string }>;
+            results: Array<{ title: string; url: string; snippet: string; content: string }>;
             resultCount: number;
           };
           searchResults = data;

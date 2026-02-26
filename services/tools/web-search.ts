@@ -15,8 +15,7 @@ interface SearchResult {
   title: string;
   url: string;
   snippet: string;
-  /** 抓取到的页面正文内容 */
-  content?: string;
+  content: string;
 }
 
 /** 每个页面内容的最大字符数 */
