@@ -34,6 +34,24 @@ export interface MessageContentItem {
 }
 
 /**
+ * 搜索结果项
+ */
+export interface SearchResultItem {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/**
+ * 搜索结果
+ */
+export interface SearchResults {
+  query: string;
+  results: SearchResultItem[];
+  resultCount: number;
+}
+
+/**
  * 聊天消息
  */
 export interface Message {
@@ -47,6 +65,8 @@ export interface Message {
   content: MessageContentItem[];
   /** 思考过程（仅 assistant） */
   thinking?: string;
+  /** 搜索结果 */
+  searchResults?: SearchResults;
   /** 使用的模型 */
   model?: string;
   /** 调用的工具列表 */

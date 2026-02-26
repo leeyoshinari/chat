@@ -8,6 +8,7 @@ import { getAdapter } from "@/services/adapters";
 import { getProviderById } from "@/config/providers";
 import { executeTool } from "@/services/tools";
 import { getToolById } from "@/config/tools";
+import { WebSearchTool } from "@/services/tools/web-search";
 
 /**
  * 验证访问密码
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
       temperature,
       maxTokens,
       password,
+      search,
     } = body;
 
     // 验证密码
@@ -58,9 +60,67 @@ export async function POST(request: NextRequest) {
     // 获取适配器
     const adapter = getAdapter(provider);
 
+    // 联网搜索逻辑
+    let searchResults: {
+      query: string;
+      results: Array<{ title: string; url: string; snippet: string }>;
+      resultCount: number;
+    } | null = null;
+    let enhancedMessages = messages;
+
+    if (search && process.env.WEB_SEARCH_ENABLED === "true") {
+      // 获取最后一条用户消息作为搜索查询
+      const lastUserMessage = messages
+        .filter((m: any) => m.role === "user")
+        .pop();
+      const userQuery =
+        typeof lastUserMessage?.content === "string"
+          ? lastUserMessage.content
+          : lastUserMessage?.content?.find((c: any) => c.type === "text")?.text;
+
+      if (userQuery) {
+        const searchTool = new WebSearchTool();
+        const searchResult = await searchTool.execute({
+          query: userQuery,
+          num_results: 5,
+        });
+
+        if (searchResult.success && searchResult.data) {
+          const data = searchResult.data as {
+            query: string;
+            results: Array<{ title: string; url: string; snippet: string; content?: string }>;
+            resultCount: number;
+          };
+          searchResults = data;
+
+          // 将搜索结果注入到系统消息中，优先使用抓取到的页面内容
+          const searchContext = `以下是关于用户问题的网络搜索结果，请参考这些信息回答：
+
+搜索关键词: ${searchResults!.query}
+搜索结果数量: ${searchResults!.resultCount}
+
+${searchResults!.results
+  .map(
+    (r, i) => `[${i + 1}] ${r.title}
+链接: ${r.url}
+内容: ${r.content || r.snippet}`
+  )
+  .join("\n\n---\n\n")}
+
+请基于以上搜索结果回答用户的问题，并在回答中适当引用来源（使用 [序号] 格式标注）。`;
+
+          // 在消息列表开头添加搜索上下文
+          enhancedMessages = [
+            { role: "system", content: searchContext },
+            ...messages,
+          ];
+        }
+      }
+    }
+
     // 构建请求
     const adapterRequest = {
-      messages,
+      messages: enhancedMessages,
       model,
       baseUrl: providerConfig.baseUrl,
       apiKey: providerConfig.apiKey,
@@ -76,6 +136,18 @@ export async function POST(request: NextRequest) {
       const readableStream = new ReadableStream({
         async start(controller) {
           try {
+            // 先发送搜索结果
+            if (searchResults) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "search_results",
+                    data: searchResults,
+                  })}\n\n`
+                )
+              );
+            }
+
             for await (const chunk of adapter.chatStream(adapterRequest)) {
               // 处理工具调用
               if (chunk.type === "tool_call" && chunk.toolCall?.name) {

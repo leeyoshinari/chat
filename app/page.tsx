@@ -34,6 +34,7 @@ interface AppConfig {
   tools: ToolDefinition[];
   requirePassword: boolean;
   historyLimit: number;
+  webSearchEnabled: boolean;
 }
 
 /**
@@ -231,24 +232,10 @@ export default function HomePage() {
         model: selectedModelId,
       });
 
-      // 如果是第一条消息，异步调用模型生成标题
+      // 如果是第一条消息，使用用户输入的前15个字作为标题
       if ((userMessage as any).needsTitle && content) {
-        // 异步生成标题，不阻塞消息发送
-        fetch("/api/summarize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content,
-            password: useChatStore.getState().accessPassword,
-          }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.title) {
-              renameSession(userMessage.sessionId, data.title);
-            }
-          })
-          .catch(console.error);
+        const title = content.length > 15 ? content.slice(0, 15) + "..." : content;
+        renameSession(userMessage.sessionId, title);
       }
 
       // 添加 AI 响应消息占位
@@ -334,6 +321,7 @@ export default function HomePage() {
         let buffer = "";
         let fullContent = "";
         let thinking = "";
+        let searchResults: any = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -355,11 +343,18 @@ export default function HomePage() {
                   await updateMessage(assistantMessageId, {
                     content: [{ type: "text", text: fullContent }],
                     thinking: thinking || undefined,
+                    searchResults: searchResults || undefined,
                   });
                 } else if (parsed.type === "thinking") {
                   thinking += parsed.content;
                   await updateMessage(assistantMessageId, {
                     thinking,
+                    searchResults: searchResults || undefined,
+                  });
+                } else if (parsed.type === "search_results") {
+                  searchResults = parsed.data;
+                  await updateMessage(assistantMessageId, {
+                    searchResults,
                   });
                 } else if (parsed.type === "error") {
                   toast.error(parsed.error || "发生错误");
@@ -377,6 +372,7 @@ export default function HomePage() {
         await updateMessage(assistantMessageId, {
           content: [{ type: "text", text: fullContent }],
           thinking: thinking || undefined,
+          searchResults: searchResults || undefined,
           isStreaming: false,
         });
       } catch (error) {
@@ -585,7 +581,7 @@ export default function HomePage() {
           isLoading={isLoading}
           onStop={handleStop}
           searchEnabled={searchEnabled}
-          onToggleSearch={currentModel?.capabilities?.search ? handleToggleSearch : undefined}
+          onToggleSearch={currentModel?.capabilities?.search && config.webSearchEnabled ? handleToggleSearch : undefined}
         />
       </main>
     </div>

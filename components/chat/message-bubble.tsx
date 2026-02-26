@@ -5,7 +5,7 @@
 "use client";
 
 import React, { memo, useState } from "react";
-import { Message, MessageContentItem } from "@/types";
+import { Message, MessageContentItem, SearchResults } from "@/types";
 import { cn, copyToClipboard, formatDate } from "@/lib/utils";
 import { Markdown } from "./markdown";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import {
   ChevronUp,
   User,
   Bot,
+  Globe,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -151,6 +153,73 @@ const ThinkingBlock = memo(function ThinkingBlock({
 });
 
 /**
+ * 搜索结果展示
+ */
+const SearchResultsBlock = memo(function SearchResultsBlock({
+  searchResults,
+}: {
+  searchResults: SearchResults;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mb-3">
+      <button
+        className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <Globe className="h-4 w-4" />
+        <span>
+          已搜索「{searchResults.query}」· 找到 {searchResults.resultCount} 条结果
+        </span>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4" />
+        ) : (
+          <ChevronDown className="h-4 w-4" />
+        )}
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-2">
+              {searchResults.results.map((result, index) => (
+                <a
+                  key={index}
+                  href={result.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      [{index + 1}]
+                    </span>
+                    <span className="text-sm font-medium text-foreground group-hover:text-primary line-clamp-1">
+                      {result.title}
+                    </span>
+                    <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                    {result.snippet}
+                  </p>
+                </a>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
+
+/**
  * 工具调用展示
  */
 const ToolCallBlock = memo(function ToolCallBlock({
@@ -264,6 +333,11 @@ export const MessageBubble = memo(function MessageBubble({
               : "bg-assistant-message text-assistant-message-foreground"
           )}
         >
+          {/* 搜索结果 */}
+          {message.searchResults && (
+            <SearchResultsBlock searchResults={message.searchResults} />
+          )}
+
           {/* 思考过程 */}
           {message.thinking && <ThinkingBlock thinking={message.thinking} />}
 

@@ -30,11 +30,15 @@ export async function GET() {
     // 历史消息限制
     const historyLimit = parseInt(process.env.HISTORY_LIMIT || "50", 10);
 
+    // 联网搜索是否启用
+    const webSearchEnabled = process.env.WEB_SEARCH_ENABLED === "true";
+
     return NextResponse.json({
       providers,
       tools,
       requirePassword,
       historyLimit,
+      webSearchEnabled,
     });
   } catch (error) {
     console.error("Config API error:", error);
