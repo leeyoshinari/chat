@@ -195,7 +195,8 @@ export const ChatInput = memo(function ChatInput({
     onSend(input.trim(), attachments);
     setInput("");
     setAttachments([]);
-    textareaRef.current?.focus();
+    // textareaRef.current?.focus();
+    textareaRef.current?.blur();
   }, [input, attachments, isLoading, disabled, onSend]);
 
   // 处理键盘事件
