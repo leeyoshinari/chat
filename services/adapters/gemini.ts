@@ -20,12 +20,52 @@ export class GeminiAdapter extends BaseAdapter {
   }
 
   /**
+   * 构建 generationConfig
+   */
+  private buildGenerationConfig(request: AdapterRequest, isTTS = false) {
+    const config: Record<string, any> = {};
+
+    if (isTTS) {
+      config.responseModalities = ["AUDIO"];
+      return config;
+    }
+
+    config.temperature = request.temperature ?? 0.7;
+    if (request.maxTokens) {
+      config.maxOutputTokens = request.maxTokens;
+    }
+
+    // 推理/思考模式
+    if (request.reasoning) {
+      config.thinkingConfig = {
+        includeThoughts: true,
+        thinkingBudget: 2048,
+      };
+    }
+
+    return config;
+  }
+
+  /**
+   * 判断是否为 TTS 模型
+   */
+  private isTTSModel(model: string): boolean {
+    return model.toLowerCase().includes("tts");
+  }
+
+  /**
    * 非流式对话
    */
   async chat(request: AdapterRequest): Promise<AdapterResponse> {
+    const baseUrl = this.getBaseUrl(request);
+
+    // TTS 模型走专用逻辑
+    if (this.isTTSModel(request.model)) {
+      return this.ttsChat(request, baseUrl);
+    }
+
     const contents = this.formatMessages(request);
     const tools = request.tools ? this.formatTools(request.tools) : undefined;
-    const baseUrl = this.getBaseUrl(request);
 
     const url = `${baseUrl}/models/${request.model}:generateContent?key=${request.apiKey}`;
 
@@ -37,10 +77,7 @@ export class GeminiAdapter extends BaseAdapter {
       body: JSON.stringify({
         contents,
         tools,
-        generationConfig: {
-          temperature: request.temperature ?? 0.7,
-          maxOutputTokens: request.maxTokens,
-        },
+        generationConfig: this.buildGenerationConfig(request),
       }),
     });
 
@@ -58,11 +95,11 @@ export class GeminiAdapter extends BaseAdapter {
     const toolCalls: any[] = [];
 
     for (const part of parts) {
-      if (part.text) {
+      if (part.thought === true && part.text) {
+        // 思考内容：thought 是布尔标记，text 是实际内容
+        thinking += part.text;
+      } else if (part.text) {
         content += part.text;
-      }
-      if (part.thought) {
-        thinking += part.thought;
       }
       if (part.functionCall) {
         toolCalls.push({
@@ -82,12 +119,72 @@ export class GeminiAdapter extends BaseAdapter {
   }
 
   /**
+   * TTS 专用非流式对话
+   * 返回 base64 音频数据
+   */
+  private async ttsChat(request: AdapterRequest, baseUrl: string): Promise<AdapterResponse> {
+    const url = `${baseUrl}/models/${request.model}:generateContent?key=${request.apiKey}`;
+
+    // 获取用户发送的文本
+    const lastMsg = request.messages[request.messages.length - 1];
+    const text = typeof lastMsg.content === "string"
+      ? lastMsg.content
+      : lastMsg.content.find((c) => c.type === "text")?.text || "";
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: { parts: [{ text }] },
+        generationConfig: this.buildGenerationConfig(request, true),
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`TTS API Error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+
+    // 提取 base64 音频数据
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        const mimeType = part.inlineData.mimeType || "audio/mp3";
+        const audioDataUrl = `data:${mimeType};base64,${part.inlineData.data}`;
+        return {
+          content: "",
+          audio: { url: audioDataUrl, mimeType },
+        };
+      }
+    }
+
+    throw new Error("TTS response did not contain audio data");
+  }
+
+  /**
    * 流式对话
    */
   async *chatStream(request: AdapterRequest): AsyncGenerator<StreamChunk> {
+    const baseUrl = this.getBaseUrl(request);
+
+    // TTS 模型不走流式，走非流式后返回音频
+    if (this.isTTSModel(request.model)) {
+      try {
+        const result = await this.ttsChat(request, baseUrl);
+        if (result.audio) {
+          yield { type: "audio", content: result.audio.url, mimeType: result.audio.mimeType };
+        }
+      } catch (error) {
+        yield { type: "error", error: error instanceof Error ? error.message : "TTS failed" };
+      }
+      yield { type: "done" };
+      return;
+    }
+
     const contents = this.formatMessages(request);
     const tools = request.tools ? this.formatTools(request.tools) : undefined;
-    const baseUrl = this.getBaseUrl(request);
 
     const url = `${baseUrl}/models/${request.model}:streamGenerateContent?key=${request.apiKey}&alt=sse`;
 
@@ -99,10 +196,7 @@ export class GeminiAdapter extends BaseAdapter {
       body: JSON.stringify({
         contents,
         tools,
-        generationConfig: {
-          temperature: request.temperature ?? 0.7,
-          maxOutputTokens: request.maxTokens,
-        },
+        generationConfig: this.buildGenerationConfig(request),
       }),
     });
 
@@ -138,11 +232,11 @@ export class GeminiAdapter extends BaseAdapter {
               const parts = parsed.candidates?.[0]?.content?.parts || [];
 
               for (const part of parts) {
-                if (part.text) {
+                if (part.thought === true && part.text) {
+                  // 思考内容：thought 是布尔标记，text 是实际内容
+                  yield { type: "thinking", content: part.text };
+                } else if (part.text) {
                   yield { type: "text", content: part.text };
-                }
-                if (part.thought) {
-                  yield { type: "thinking", content: part.thought };
                 }
                 if (part.functionCall) {
                   yield {

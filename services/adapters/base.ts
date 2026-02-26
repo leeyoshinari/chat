@@ -65,6 +65,8 @@ export interface AdapterResponse {
   toolCalls?: ToolCall[];
   /** 生成的图片 */
   images?: string[];
+  /** 音频数据 (TTS) */
+  audio?: { url: string; mimeType: string };
   /** 使用的 token 数量 */
   usage?: {
     promptTokens: number;

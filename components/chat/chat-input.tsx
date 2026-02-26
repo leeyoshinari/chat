@@ -4,7 +4,7 @@
  */
 "use client";
 
-import React, { memo, useState, useRef, useCallback, useEffect } from "react";
+import React, { memo, useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
@@ -102,6 +102,22 @@ interface ChatInputProps {
 }
 
 /**
+ * 获取当前语言
+ */
+function getLanguage(): "zh" | "en" {
+  if (typeof navigator === "undefined") return "en";
+  const lang = navigator.language.toLowerCase();
+  return lang.startsWith("zh") ? "zh" : "en";
+}
+
+const i18n = {
+  placeholder: {
+    zh: "输入消息... Enter 发送，Shift+Enter 换行",
+    en: "Type a message... Enter to send, Shift+Enter for new line",
+  },
+};
+
+/**
  * 输入框组件
  */
 export const ChatInput = memo(function ChatInput({
@@ -185,14 +201,17 @@ export const ChatInput = memo(function ChatInput({
   // 处理键盘事件
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Cmd/Ctrl + Enter 发送
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      // Enter 发送（不带 Shift）
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
         handleSend();
       }
+      // Shift+Enter 换行（浏览器默认行为，无需处理）
     },
     [handleSend]
   );
+
+  const lang = useMemo(() => getLanguage(), []);
 
   // 处理文件上传
   const handleFileUpload = useCallback(
@@ -472,7 +491,7 @@ export const ChatInput = memo(function ChatInput({
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="输入消息... 按 Cmd+Enter 发送"
+            placeholder={i18n.placeholder[lang]}
             className="min-h-[44px] max-h-[200px] resize-none"
             autoResize
             disabled={disabled}

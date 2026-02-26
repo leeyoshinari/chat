@@ -351,6 +351,17 @@ export default function HomePage() {
                     thinking,
                     searchResults: searchResults || undefined,
                   });
+                } else if (parsed.type === "audio") {
+                  // TTS 音频：content 是 data URL
+                  await updateMessage(assistantMessageId, {
+                    content: [
+                      {
+                        type: "audio",
+                        url: parsed.content,
+                        mimeType: parsed.mimeType || "audio/mp3",
+                      },
+                    ],
+                  });
                 } else if (parsed.type === "search_results") {
                   searchResults = parsed.data;
                   await updateMessage(assistantMessageId, {

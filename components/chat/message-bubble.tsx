@@ -33,6 +33,55 @@ interface MessageBubbleProps {
 }
 
 /**
+ * 音频播放器组件
+ * 将 data URL 转换为 Blob URL 以提升性能
+ */
+const AudioPlayer = memo(function AudioPlayer({
+  url,
+  mimeType,
+}: {
+  url: string;
+  mimeType: string;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!url) return;
+
+    // data URL -> Blob URL
+    if (url.startsWith("data:")) {
+      try {
+        const [meta, base64Data] = url.split(",");
+        const detectedMime = meta.match(/data:(.*?);/)?.[1] || mimeType;
+        const byteChars = atob(base64Data);
+        const byteArray = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteArray[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteArray], { type: detectedMime });
+        const objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+        return () => URL.revokeObjectURL(objectUrl);
+      } catch {
+        // 转换失败，直接使用原始 URL
+        setBlobUrl(url);
+      }
+    } else {
+      setBlobUrl(url);
+    }
+  }, [url, mimeType]);
+
+  if (!blobUrl) return null;
+
+  return (
+    <audio controls className="w-full max-w-md">
+      <source src={blobUrl} type={mimeType} />
+      Your browser does not support the audio element.
+    </audio>
+  );
+});
+
+/**
  * 渲染消息内容
  */
 const MessageContent = memo(function MessageContent({
@@ -82,10 +131,7 @@ const MessageContent = memo(function MessageContent({
 
           case "audio":
             return (
-              <audio key={index} controls className="w-full max-w-md">
-                <source src={item.url} type={item.mimeType} />
-                Your browser does not support the audio element.
-              </audio>
+              <AudioPlayer key={index} url={item.url || ""} mimeType={item.mimeType || "audio/mp3"} />
             );
 
           case "video":

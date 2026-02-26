@@ -17,19 +17,26 @@ export class OpenAIAdapter extends BaseAdapter {
     const messages = this.formatMessages(request);
     const tools = request.tools ? toOpenAITools(request.tools) : undefined;
 
+    const body: Record<string, any> = {
+      model: request.model,
+      messages,
+      tools: tools?.length ? tools : undefined,
+      temperature: request.temperature ?? 0.7,
+      max_tokens: request.maxTokens,
+    };
+
+    // 推理模式
+    if (request.reasoning) {
+      body.reasoning = { effort: "high" };
+    }
+
     const response = await fetch(`${request.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${request.apiKey}`,
       },
-      body: JSON.stringify({
-        model: request.model,
-        messages,
-        tools: tools?.length ? tools : undefined,
-        temperature: request.temperature ?? 0.7,
-        max_tokens: request.maxTokens,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -42,6 +49,7 @@ export class OpenAIAdapter extends BaseAdapter {
 
     return {
       content: choice.message.content || "",
+      thinking: choice.message.reasoning_content || undefined,
       toolCalls: choice.message.tool_calls?.map((tc: any) => ({
         id: tc.id,
         name: tc.function.name,
@@ -65,20 +73,27 @@ export class OpenAIAdapter extends BaseAdapter {
     const messages = this.formatMessages(request);
     const tools = request.tools ? toOpenAITools(request.tools) : undefined;
 
+    const body: Record<string, any> = {
+      model: request.model,
+      messages,
+      tools: tools?.length ? tools : undefined,
+      temperature: request.temperature ?? 0.7,
+      max_tokens: request.maxTokens,
+      stream: true,
+    };
+
+    // 推理模式
+    if (request.reasoning) {
+      body.reasoning = { effort: "high" };
+    }
+
     const response = await fetch(`${request.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${request.apiKey}`,
       },
-      body: JSON.stringify({
-        model: request.model,
-        messages,
-        tools: tools?.length ? tools : undefined,
-        temperature: request.temperature ?? 0.7,
-        max_tokens: request.maxTokens,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -119,6 +134,11 @@ export class OpenAIAdapter extends BaseAdapter {
 
               if (delta?.content) {
                 yield { type: "text", content: delta.content };
+              }
+
+              // 推理模式思考内容
+              if (delta?.reasoning_content) {
+                yield { type: "thinking", content: delta.reasoning_content };
               }
 
               if (delta?.tool_calls) {
