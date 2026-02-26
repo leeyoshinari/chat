@@ -123,6 +123,8 @@ export interface ModelCapabilities {
   search?: boolean;
   /** 支持语音生成 */
   tts?: boolean;
+  /** 支持语音识别 */
+  asr?: boolean;
 }
 
 /**

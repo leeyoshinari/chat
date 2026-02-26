@@ -54,6 +54,9 @@ function parseCapabilities(capStr: string): ModelCapabilities {
       case "tts":
         caps.tts = true;
         break;
+      case "asr":
+        caps.asr = true;
+        break;
     }
   });
 

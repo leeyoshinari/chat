@@ -26,12 +26,14 @@
  * ```
  */
 
-import { MessageContentItem, ToolCall, ToolDefinition } from "@/types";
+import { MessageContentItem, ModelCapabilities, ToolCall, ToolDefinition } from "@/types";
 
 /**
  * 适配器请求
  */
 export interface AdapterRequest {
+  /** 模型能力标识 */
+  capabilities?: ModelCapabilities;
   /** 消息历史 */
   messages: Array<{
     role: "user" | "assistant" | "system";

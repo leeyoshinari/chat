@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdapter } from "@/services/adapters";
-import { getProviderById } from "@/config/providers";
+import { getProviderById, getModelById } from "@/config/providers";
 import { executeTool } from "@/services/tools";
 import { getToolById } from "@/config/tools";
 import { WebSearchTool } from "@/services/tools/web-search";
@@ -59,6 +59,9 @@ export async function POST(request: NextRequest) {
 
     // 获取适配器
     const adapter = getAdapter(provider);
+
+    // 获取模型配置（用于能力标识）
+    const modelConfig = getModelById(model, provider);
 
     // 联网搜索逻辑
     let searchResults: {
@@ -128,6 +131,7 @@ ${searchResults!.results
       tools: tools?.map((id: string) => getToolById(id)).filter(Boolean),
       temperature,
       maxTokens,
+      capabilities: modelConfig?.capabilities,
     };
 
     // 流式响应

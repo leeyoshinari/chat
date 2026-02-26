@@ -11,17 +11,20 @@ import { BaseAdapter } from "./base";
 import { OpenAIAdapter } from "./openai";
 import { GeminiAdapter } from "./gemini";
 import { AnthropicAdapter } from "./anthropic";
+import { CloudflareAdapter } from "./cloudflare";
 
 /**
  * 适配器注册表
  * key 为提供商 ID，value 为适配器类
  */
 const ADAPTERS: Record<string, new () => BaseAdapter> = {
-  // OpenAI 及其兼容 API（DeepSeek、Qwen、Cloudflare 等）
+  // OpenAI 及其兼容 API（DeepSeek、Qwen 等）
   openai: OpenAIAdapter,
   deepseek: OpenAIAdapter,
   qwen: OpenAIAdapter,
-  cloudflare: OpenAIAdapter,
+  
+  // Cloudflare Workers AI（独立适配器，支持文生图/TTS/ASR）
+  cloudflare: CloudflareAdapter,
   
   // Google Gemini
   google: GeminiAdapter,

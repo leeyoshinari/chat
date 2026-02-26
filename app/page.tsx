@@ -314,6 +314,7 @@ export default function HomePage() {
         let thinking = "";
         let searchResults: any = null;
         let audioContent: any = null;
+        let imageContent: any = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -353,6 +354,15 @@ export default function HomePage() {
                   await updateMessage(assistantMessageId, {
                     content: [audioContent],
                   });
+                } else if (parsed.type === "image") {
+                  // 图片生成
+                  const imgUrl = parsed.imageUrl || parsed.content;
+                  if (imgUrl) {
+                    imageContent = { type: "image", url: imgUrl };
+                    await updateMessage(assistantMessageId, {
+                      content: [imageContent],
+                    });
+                  }
                 } else if (parsed.type === "search_results") {
                   searchResults = parsed.data;
                   await updateMessage(assistantMessageId, {
@@ -370,10 +380,12 @@ export default function HomePage() {
           }
         }
 
-        // 完成流式输出 - 保留音频内容，不覆盖
+        // 完成流式输出 - 保留音频/图片内容，不覆盖
         const finalContent = audioContent
           ? [audioContent]
-          : [{ type: "text", text: fullContent }];
+          : imageContent
+            ? [imageContent]
+            : [{ type: "text", text: fullContent }];
 
         await updateMessage(assistantMessageId, {
           content: finalContent,

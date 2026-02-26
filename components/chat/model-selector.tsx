@@ -30,6 +30,7 @@ import {
   Image,
   Bot,
   Volume2,
+  Mic,
 } from "lucide-react";
 
 /**
@@ -46,6 +47,7 @@ const CapabilityIcons: Record<
   search: { icon: <Search className="h-3 w-3" />, label: "联网搜索" },
   imageOutput: { icon: <Image className="h-3 w-3" />, label: "图片生成" },
   tts: { icon: <Volume2 className="h-3 w-3" />, label: "语音生成" },
+  asr: { icon: <Mic className="h-3 w-3" />, label: "语音识别" },
 };
 
 /**

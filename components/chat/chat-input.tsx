@@ -31,6 +31,7 @@ import {
   Loader2,
   Square,
   Globe,
+  AudioLines,
 } from "lucide-react";
 import { ModelSelector } from "./model-selector";
 import { ToolSelector } from "./tool-selector";
@@ -148,6 +149,7 @@ export const ChatInput = memo(function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
   // 获取当前模型能力
   const currentModel = React.useMemo(() => {
@@ -187,17 +189,35 @@ export const ChatInput = memo(function ChatInput({
     []
   );
 
+  // 收起移动端键盘 - iOS Safari 需要特殊处理
+  const dismissKeyboard = useCallback(() => {
+    // 立即 blur 当前活跃元素
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    // 双重保障：textarea 也显式 blur
+    textareaRef.current?.blur();
+    // iOS Safari 需要延迟再次尝试，因为 React 状态更新可能导致重新聚焦
+    setTimeout(() => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      textareaRef.current?.blur();
+    }, 50);
+  }, []);
+
   // 处理发送
   const handleSend = useCallback(() => {
     if (!input.trim() && attachments.length === 0) return;
     if (isLoading || disabled) return;
 
+    // 先收起键盘，再更新状态（顺序很重要，iOS 上反过来会失效）
+    dismissKeyboard();
+
     onSend(input.trim(), attachments);
     setInput("");
     setAttachments([]);
-    // textareaRef.current?.focus();
-    textareaRef.current?.blur();
-  }, [input, attachments, isLoading, disabled, onSend]);
+  }, [input, attachments, isLoading, disabled, onSend, dismissKeyboard]);
 
   // 处理键盘事件
   const handleKeyDown = useCallback(
@@ -353,6 +373,34 @@ export const ChatInput = memo(function ChatInput({
           </>
         )}
 
+        {/* 上传音频（如果支持语音识别） */}
+        {capabilities.asr && (
+          <>
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept=".mp3,.wav,.flac,.ogg,.m4a,audio/mp3,audio/wav,audio/flac,audio/ogg"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files, "file")}
+            />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => audioInputRef.current?.click()}
+                    disabled={disabled}
+                  >
+                    <AudioLines className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>上传音频</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        )}
+
         {/* 工具选择器（如果支持且工具列表不为空） */}
         {capabilities.functionCall && tools.length > 0 && (
           <ToolSelector
@@ -501,6 +549,10 @@ export const ChatInput = memo(function ChatInput({
             disabled={disabled}
           />
           <Button
+            onMouseDown={(e) => {
+              // 阻止按钮获取焦点，防止 iOS 键盘先收再弹
+              e.preventDefault();
+            }}
             onClick={isLoading ? onStop : handleSend}
             disabled={(!input.trim() && attachments.length === 0 && !isLoading) || disabled}
             className="h-[44px] px-4"
