@@ -162,7 +162,7 @@ export const ModelSelector = memo(function ModelSelector({
       </TooltipProvider>
 
       <PopoverContent className="w-auto min-w-[320px] max-w-[400px] p-0" align="start">
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="max-h-[70vh]" style={{ overflowY: "auto" }}>
           <div className="p-2">
             {providers.map((provider) => (
               <div key={provider.id} className="mb-4">

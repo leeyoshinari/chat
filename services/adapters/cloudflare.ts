@@ -24,6 +24,31 @@ function detectModelType(capabilities?: ModelCapabilities): "chat" | "tts" | "as
   return "chat";
 }
 
+/**
+ * 去除 URL 末尾的斜杠，防止拼接时出现 // 导致路由错误
+ */
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+/**
+ * 构建 Cloudflare Workers AI /run/ 端点 URL
+ * 模型名如 @cf/meta/llama-3.1-8b-instruct，包含 @ 和 / 字符
+ * Cloudflare 接受这些字符作为路径的一部分，无需编码
+ */
+function buildRunUrl(baseUrl: string, model: string): string {
+  const base = normalizeBaseUrl(baseUrl);
+  return `${base}/run/${model}`;
+}
+
+/**
+ * 构建 OpenAI 兼容的 chat completions 端点 URL
+ */
+function buildChatUrl(baseUrl: string): string {
+  const base = normalizeBaseUrl(baseUrl);
+  return `${base}/v1/chat/completions`;
+}
+
 export class CloudflareAdapter extends BaseAdapter {
   /**
    * 非流式对话
@@ -75,7 +100,7 @@ export class CloudflareAdapter extends BaseAdapter {
     const messages = this.formatMessages(request);
     const tools = request.tools ? toOpenAITools(request.tools) : undefined;
 
-    const response = await fetch(`${request.baseUrl}/v1/chat/completions`, {
+    const response = await fetch(buildChatUrl(request.baseUrl), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -166,7 +191,7 @@ export class CloudflareAdapter extends BaseAdapter {
     const messages = this.formatMessages(request);
     const tools = request.tools ? toOpenAITools(request.tools) : undefined;
 
-    const response = await fetch(`${request.baseUrl}/v1/chat/completions`, {
+    const response = await fetch(buildChatUrl(request.baseUrl), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -214,27 +239,31 @@ export class CloudflareAdapter extends BaseAdapter {
   private async textToImage(request: AdapterRequest): Promise<AdapterResponse> {
     const lastMsg = request.messages[request.messages.length - 1];
     const text = this.contentToText(lastMsg.content);
-    const images = typeof lastMsg.content === "string"
-      ? []
-      : this.extractImages(lastMsg.content);
 
-    // 有图片附件 -> 图生图，否则 -> 文生图
-    if (images.length > 0) {
-      return this.imageToImage(request, text, images[0]);
+    // 提取图片附件（含 mimeType 和 fileName）
+    const imageItem = typeof lastMsg.content === "string"
+      ? null
+      : lastMsg.content.find((c) => c.type === "image" && c.url);
+
+    if (imageItem?.url) {
+      return this.imageToImage(request, text, imageItem.url, imageItem.mimeType, imageItem.fileName);
     }
 
-    const url = `${request.baseUrl}/run/${request.model}`;
+    const url = buildRunUrl(request.baseUrl, request.model);
+
+    // 使用 FormData
+    const formData = new FormData();
+    formData.append("prompt", text);
+    formData.append("num_steps", "4");
+    formData.append("guidance", "7.5");
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
-        "Content-Type": "application/json",
+        Accept: "image/png",
       },
-      body: JSON.stringify({
-        prompt: text,
-        num_steps: 4,
-      }),
+      body: formData,
     });
 
     if (!response.ok) {
@@ -242,10 +271,11 @@ export class CloudflareAdapter extends BaseAdapter {
       throw new Error(`Image API Error: ${response.status} - ${error}`);
     }
 
-    // 返回二进制图片数据
+    // 从响应头获取实际返回的 Content-Type，兜底 image/png
+    const contentType = response.headers.get("Content-Type") || "image/png";
     const imageBuffer = await response.arrayBuffer();
     const base64 = this.arrayBufferToBase64(imageBuffer);
-    const dataUrl = `data:image/png;base64,${base64}`;
+    const dataUrl = `data:${contentType};base64,${base64}`;
 
     return {
       content: "",
@@ -256,24 +286,42 @@ export class CloudflareAdapter extends BaseAdapter {
   private async imageToImage(
     request: AdapterRequest,
     prompt: string,
-    imageUrl: string
+    imageUrl: string,
+    mimeType?: string,
+    fileName?: string
   ): Promise<AdapterResponse> {
-    const url = `${request.baseUrl}/run/${request.model}`;
 
-    // 将图片 URL/data URL 转为字节数组
-    const imageBytes = await this.imageUrlToByteArray(imageUrl);
+    const url = buildRunUrl(request.baseUrl, request.model);
+
+    // 获取图片字节
+    const imageBytes: number[] = await this.imageUrlToByteArray(imageUrl);
+    const imageUint8 = new Uint8Array(imageBytes);
+
+    // 自动识别图片类型：优先用传入的 mimeType，其次从 data URL 中解析
+    const resolvedMimeType = mimeType
+      || this.parseMimeTypeFromDataUrl(imageUrl)
+      || "image/png";
+
+    // 根据 MIME 类型推导文件扩展名
+    const ext = this.mimeToExtension(resolvedMimeType);
+    const resolvedFileName = fileName || `input.${ext}`;
+
+    const formData = new FormData();
+    formData.append("prompt", prompt);
+    formData.append("strength", "0.6");
+    formData.append("guidance", "7.5");
+
+    // 使用正确的 MIME 类型和文件名上传
+    const blob = new Blob([imageUint8], { type: resolvedMimeType });
+    formData.append("image", blob, resolvedFileName);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
-        "Content-Type": "application/json",
+        Accept: resolvedMimeType,
       },
-      body: JSON.stringify({
-        prompt,
-        image: imageBytes,
-        strength: 0.5,
-      }),
+      body: formData,
     });
 
     if (!response.ok) {
@@ -281,9 +329,11 @@ export class CloudflareAdapter extends BaseAdapter {
       throw new Error(`Image-to-Image API Error: ${response.status} - ${error}`);
     }
 
+    // 从响应头获取实际返回的 Content-Type，兜底用原图类型
+    const contentType = response.headers.get("Content-Type") || resolvedMimeType;
     const imageBuffer = await response.arrayBuffer();
     const base64 = this.arrayBufferToBase64(imageBuffer);
-    const dataUrl = `data:image/png;base64,${base64}`;
+    const dataUrl = `data:${contentType};base64,${base64}`;
 
     return {
       content: "",
@@ -299,17 +349,18 @@ export class CloudflareAdapter extends BaseAdapter {
     const lastMsg = request.messages[request.messages.length - 1];
     const text = this.contentToText(lastMsg.content);
 
-    const url = `${request.baseUrl}/run/${request.model}`;
+    const url = buildRunUrl(request.baseUrl, request.model);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
         "Content-Type": "application/json",
+        Accept: "audio/wav",
       },
       body: JSON.stringify({
-        prompt: text,
-        lang: "zh",
+        text: text,
+        voice: "zh",
       }),
     });
 
@@ -354,13 +405,14 @@ export class CloudflareAdapter extends BaseAdapter {
       return { content: "请上传音频文件进行语音识别。" };
     }
 
-    const url = `${request.baseUrl}/run/${request.model}`;
+    const url = buildRunUrl(request.baseUrl, request.model);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
         "Content-Type": "application/octet-stream",
+        Accept: "application/json",
       },
       body: audioData.buffer as ArrayBuffer,
     });
@@ -442,5 +494,32 @@ export class CloudflareAdapter extends BaseAdapter {
     const response = await fetch(dataUrl);
     const buffer = await response.arrayBuffer();
     return new Uint8Array(buffer);
+  }
+
+  /**
+   * 从 data URL 中解析 MIME 类型
+   * 例如 data:image/jpeg;base64,... → image/jpeg
+   */
+  private parseMimeTypeFromDataUrl(url: string): string | null {
+    if (!url.startsWith("data:")) return null;
+    const match = url.match(/^data:([^;,]+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * 根据 MIME 类型返回文件扩展名
+   */
+  private mimeToExtension(mimeType: string): string {
+    const map: Record<string, string> = {
+      "image/png": "png",
+      "image/jpeg": "jpg",
+      "image/jpg": "jpg",
+      "image/gif": "gif",
+      "image/webp": "webp",
+      "image/bmp": "bmp",
+      "image/svg+xml": "svg",
+      "image/tiff": "tiff",
+    };
+    return map[mimeType.toLowerCase()] || "png";
   }
 }
