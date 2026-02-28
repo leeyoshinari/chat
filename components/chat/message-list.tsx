@@ -11,6 +11,32 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 /**
+ * 获取当前语言
+ */
+function getLanguage(): "zh" | "en" {
+  if (typeof window === "undefined") return "zh";
+  const lang = navigator.language.toLowerCase();
+  return lang.startsWith("zh") ? "zh" : "en";
+}
+
+/**
+ * 多语言文本
+ */
+const i18n = {
+  morning: { zh: "早上好", en: "Good Morning" },
+  afternoon: { zh: "下午好", en: "Good Afternoon" },
+  evening: { zh: "晚上好", en: "Good Evening" },
+  welcome: {
+    zh: "我是你的 AI 助手，有什么可以帮助你的吗？",
+    en: "I'm your AI assistant. How can I help you?",
+  },
+  roleTip: {
+    zh: "你可以输入 <code>/</code> 来选择不同的角色。",
+    en: "Type <code>/</code> to select a different role.",
+  },
+};
+
+/**
  * 消息列表属性
  */
 interface MessageListProps {
@@ -30,12 +56,14 @@ interface MessageListProps {
  * 欢迎消息组件
  */
 const WelcomeMessage = memo(function WelcomeMessage() {
+  const lang = getLanguage();
+
   // 根据时间显示问候语
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return { emoji: "☀️", text: "早上好" };
-    if (hour < 18) return { emoji: "🌤️", text: "下午好" };
-    return { emoji: "🌙", text: "晚上好" };
+    if (hour < 12) return { emoji: "☀️", text: i18n.morning[lang] };
+    if (hour < 18) return { emoji: "🌤️", text: i18n.afternoon[lang] };
+    return { emoji: "🌙", text: i18n.evening[lang] };
   };
 
   const greeting = getGreeting();
@@ -45,9 +73,14 @@ const WelcomeMessage = memo(function WelcomeMessage() {
       <div className="text-6xl mb-4">{greeting.emoji}</div>
       <h1 className="text-2xl font-bold mb-2">{greeting.text}</h1>
       <p className="text-muted-foreground max-w-md">
-        我是你的 AI 助手，有什么可以帮助你的吗？
+        {i18n.welcome[lang]}
         <br />
-        你可以输入 <code className="bg-muted px-1 rounded">/</code> 来选择不同的角色。
+        <span dangerouslySetInnerHTML={{
+          __html: i18n.roleTip[lang].replace(
+            "<code>/</code>",
+            '<code class="bg-muted px-1 rounded">/</code>'
+          ),
+        }} />
       </p>
     </div>
   );

@@ -34,6 +34,35 @@ import {
 } from "lucide-react";
 
 /**
+ * 获取当前语言
+ */
+function getLanguage(): "zh" | "en" {
+  if (typeof window === "undefined") return "zh";
+  const lang = navigator.language.toLowerCase();
+  return lang.startsWith("zh") ? "zh" : "en";
+}
+
+/**
+ * 多语言文本
+ */
+const i18n = {
+  chatList: { zh: "对话列表", en: "Chats" },
+  searchPlaceholder: { zh: "搜索对话...", en: "Search chats..." },
+  today: { zh: "今天", en: "Today" },
+  yesterday: { zh: "昨天", en: "Yesterday" },
+  thisWeek: { zh: "本周", en: "This Week" },
+  older: { zh: "更早", en: "Older" },
+  noMatch: { zh: "未找到匹配的对话", en: "No matching chats found" },
+  noChats: { zh: "暂无对话", en: "No chats yet" },
+  renameTitle: { zh: "重命名对话", en: "Rename Chat" },
+  renamePlaceholder: { zh: "输入新标题", en: "Enter new title" },
+  cancel: { zh: "取消", en: "Cancel" },
+  confirm: { zh: "确认", en: "Confirm" },
+  rename: { zh: "重命名", en: "Rename" },
+  delete: { zh: "删除", en: "Delete" },
+};
+
+/**
  * 侧边栏属性
  */
 interface SidebarProps {
@@ -65,6 +94,7 @@ interface SessionGroup {
  * 按时间分组会话
  */
 function groupSessionsByDate(sessions: Session[]): SessionGroup[] {
+  const lang = getLanguage();
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
@@ -92,16 +122,16 @@ function groupSessionsByDate(sessions: Session[]): SessionGroup[] {
 
   const result: SessionGroup[] = [];
   if (groups.today.length > 0) {
-    result.push({ label: "今天", sessions: groups.today });
+    result.push({ label: i18n.today[lang], sessions: groups.today });
   }
   if (groups.yesterday.length > 0) {
-    result.push({ label: "昨天", sessions: groups.yesterday });
+    result.push({ label: i18n.yesterday[lang], sessions: groups.yesterday });
   }
   if (groups.thisWeek.length > 0) {
-    result.push({ label: "本周", sessions: groups.thisWeek });
+    result.push({ label: i18n.thisWeek[lang], sessions: groups.thisWeek });
   }
   if (groups.older.length > 0) {
-    result.push({ label: "更早", sessions: groups.older });
+    result.push({ label: i18n.older[lang], sessions: groups.older });
   }
 
   return result;
@@ -148,7 +178,7 @@ export const Sidebar = memo(function Sidebar({
     <div className="flex flex-col h-full bg-sidebar">
       {/* 头部 */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        <h2 className="font-semibold">对话列表</h2>
+        <h2 className="font-semibold">{i18n.chatList[getLanguage()]}</h2>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon-sm" onClick={onNewSession}>
             <Plus className="h-4 w-4" />
@@ -168,7 +198,7 @@ export const Sidebar = memo(function Sidebar({
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索对话..."
+            placeholder={i18n.searchPlaceholder[getLanguage()]}
             className="pl-9 bg-sidebar"
           />
         </div>
@@ -211,7 +241,7 @@ export const Sidebar = memo(function Sidebar({
             ))
           ) : (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              {searchQuery ? "未找到匹配的对话" : "暂无对话"}
+              {searchQuery ? i18n.noMatch[getLanguage()] : i18n.noChats[getLanguage()]}
             </div>
           )}
         </div>
@@ -226,14 +256,14 @@ export const Sidebar = memo(function Sidebar({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>重命名对话</DialogTitle>
+            <DialogTitle>{i18n.renameTitle[getLanguage()]}</DialogTitle>
           </DialogHeader>
           <Input
             value={renameDialog.title}
             onChange={(e) =>
               setRenameDialog((prev) => ({ ...prev, title: e.target.value }))
             }
-            placeholder="输入新标题"
+            placeholder={i18n.renamePlaceholder[getLanguage()]}
             onKeyDown={(e) => e.key === "Enter" && handleRename()}
           />
           <DialogFooter>
@@ -243,9 +273,9 @@ export const Sidebar = memo(function Sidebar({
                 setRenameDialog({ open: false, sessionId: "", title: "" })
               }
             >
-              取消
+              {i18n.cancel[getLanguage()]}
             </Button>
-            <Button onClick={handleRename}>确认</Button>
+            <Button onClick={handleRename}>{i18n.confirm[getLanguage()]}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -303,14 +333,14 @@ const SessionItem = memo(function SessionItem({
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onRename}>
             <Pencil className="h-4 w-4 mr-2" />
-            重命名
+            {i18n.rename[getLanguage()]}
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-destructive"
             onClick={onDelete}
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            删除
+            {i18n.delete[getLanguage()]}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

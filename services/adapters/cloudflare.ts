@@ -240,7 +240,6 @@ export class CloudflareAdapter extends BaseAdapter {
     const lastMsg = request.messages[request.messages.length - 1];
     const text = this.contentToText(lastMsg.content);
 
-    // 提取图片附件（含 mimeType 和 fileName）
     const imageItem = typeof lastMsg.content === "string"
       ? null
       : lastMsg.content.find((c) => c.type === "image" && c.url);
@@ -250,8 +249,6 @@ export class CloudflareAdapter extends BaseAdapter {
     }
 
     const url = buildRunUrl(request.baseUrl, request.model);
-
-    // 使用 FormData
     const formData = new FormData();
     formData.append("prompt", text);
     formData.append("num_steps", "4");
@@ -261,7 +258,6 @@ export class CloudflareAdapter extends BaseAdapter {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
-        Accept: "image/png",
       },
       body: formData,
     });
@@ -271,12 +267,11 @@ export class CloudflareAdapter extends BaseAdapter {
       throw new Error(`Image API Error: ${response.status} - ${error}`);
     }
 
-    // 从响应头获取实际返回的 Content-Type，兜底 image/png
-    const contentType = response.headers.get("Content-Type") || "image/png";
-    const imageBuffer = await response.arrayBuffer();
-    const base64 = this.arrayBufferToBase64(imageBuffer);
-    const dataUrl = `data:${contentType};base64,${base64}`;
-
+    const data = await response.json();
+    if (!data.success || !data.result?.image) {
+      throw new Error(`Image API Error: ${JSON.stringify(data.errors || data)}`);
+    }
+    const dataUrl = `data:image/png;base64,${data.result.image}`;
     return {
       content: "",
       images: [dataUrl],
@@ -292,17 +287,13 @@ export class CloudflareAdapter extends BaseAdapter {
   ): Promise<AdapterResponse> {
 
     const url = buildRunUrl(request.baseUrl, request.model);
-
-    // 获取图片字节
     const imageBytes: number[] = await this.imageUrlToByteArray(imageUrl);
     const imageUint8 = new Uint8Array(imageBytes);
 
-    // 自动识别图片类型：优先用传入的 mimeType，其次从 data URL 中解析
     const resolvedMimeType = mimeType
       || this.parseMimeTypeFromDataUrl(imageUrl)
       || "image/png";
 
-    // 根据 MIME 类型推导文件扩展名
     const ext = this.mimeToExtension(resolvedMimeType);
     const resolvedFileName = fileName || `input.${ext}`;
 
@@ -310,8 +301,6 @@ export class CloudflareAdapter extends BaseAdapter {
     formData.append("prompt", prompt);
     formData.append("strength", "0.6");
     formData.append("guidance", "7.5");
-
-    // 使用正确的 MIME 类型和文件名上传
     const blob = new Blob([imageUint8], { type: resolvedMimeType });
     formData.append("image", blob, resolvedFileName);
 
@@ -319,7 +308,6 @@ export class CloudflareAdapter extends BaseAdapter {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
-        Accept: resolvedMimeType,
       },
       body: formData,
     });
@@ -329,12 +317,11 @@ export class CloudflareAdapter extends BaseAdapter {
       throw new Error(`Image-to-Image API Error: ${response.status} - ${error}`);
     }
 
-    // 从响应头获取实际返回的 Content-Type，兜底用原图类型
-    const contentType = response.headers.get("Content-Type") || resolvedMimeType;
-    const imageBuffer = await response.arrayBuffer();
-    const base64 = this.arrayBufferToBase64(imageBuffer);
-    const dataUrl = `data:${contentType};base64,${base64}`;
-
+    const data = await response.json();
+    if (!data.success || !data.result?.image) {
+      throw new Error(`Image-to-Image API Error: ${JSON.stringify(data.errors || data)}`);
+    }
+    const dataUrl = `data:image/png;base64,${data.result.image}`;
     return {
       content: "",
       images: [dataUrl],
@@ -350,16 +337,14 @@ export class CloudflareAdapter extends BaseAdapter {
     const text = this.contentToText(lastMsg.content);
 
     const url = buildRunUrl(request.baseUrl, request.model);
-
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
         "Content-Type": "application/json",
-        Accept: "audio/wav",
       },
       body: JSON.stringify({
-        text: text,
+        prompt: text,
         voice: "zh",
       }),
     });
@@ -369,11 +354,11 @@ export class CloudflareAdapter extends BaseAdapter {
       throw new Error(`TTS API Error: ${response.status} - ${error}`);
     }
 
-    // 返回二进制 WAV 音频数据
-    const audioBuffer = await response.arrayBuffer();
-    const base64 = this.arrayBufferToBase64(audioBuffer);
-    const audioDataUrl = `data:audio/wav;base64,${base64}`;
-
+    const data = await response.json();
+    if (!data.success || !data.result?.audio) {
+      throw new Error(`TTS API Error: ${JSON.stringify(data.errors || data)}`);
+    }
+    const audioDataUrl = `data:audio/wav;base64,${data.result.audio}`;
     return {
       content: "",
       audio: { url: audioDataUrl, mimeType: "audio/wav" },
@@ -387,34 +372,36 @@ export class CloudflareAdapter extends BaseAdapter {
   private async speechToText(request: AdapterRequest): Promise<AdapterResponse> {
     const lastMsg = request.messages[request.messages.length - 1];
     const content = lastMsg.content;
-
-    // 从消息中提取音频附件
-    let audioData: Uint8Array | null = null;
-
+    let audioBase64: string | null = null;
     if (typeof content !== "string") {
       const audioItem = content.find(
         (c) => c.type === "audio" || c.type === "file"
       );
       if (audioItem?.url) {
-        audioData = await this.dataUrlToUint8Array(audioItem.url);
+        if (audioItem.url.startsWith("data:")) {
+          audioBase64 = audioItem.url.split(",")[1];
+        } else {
+          const resp = await fetch(audioItem.url);
+          const buffer = await resp.arrayBuffer();
+          audioBase64 = this.arrayBufferToBase64(buffer);
+        }
       }
     }
 
-    if (!audioData) {
-      // 没有音频附件，返回提示
+    if (!audioBase64) {
       return { content: "请上传音频文件进行语音识别。" };
     }
 
     const url = buildRunUrl(request.baseUrl, request.model);
-
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
-        "Content-Type": "application/octet-stream",
-        Accept: "application/json",
+        "Content-Type": "application/json",
       },
-      body: audioData.buffer as ArrayBuffer,
+      body: JSON.stringify({
+        audio: audioBase64,
+      }),
     });
 
     if (!response.ok) {
@@ -422,10 +409,36 @@ export class CloudflareAdapter extends BaseAdapter {
       throw new Error(`ASR API Error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
-    const transcript = data.result?.text || "";
+    const resp = await response.json();
+    const data = resp.result;
 
-    return { content: transcript };
+    if (!data || !data.text) {
+      throw new Error(`ASR API Error: ${JSON.stringify(resp.errors || resp)}`);
+    }
+
+    // 格式化带时间戳的识别结果
+    let allText = "";
+    const fullText = data.text;
+    const segments = data.segments || [];
+
+    if (segments.length > 0) {
+      const lastSegment = segments[segments.length - 1];
+      const lastWords = lastSegment.words || [];
+      const endTime = lastWords.length > 0 ? lastWords[lastWords.length - 1].end : 0;
+      allText += `**[0.00 → ${endTime.toFixed(2)}]** ${fullText}\n\n`;
+
+      for (const segment of segments) {
+        const words = segment.words || [];
+        if (words.length === 0) continue;
+        const startTime = words[0].start;
+        const segEnd = words[words.length - 1].end;
+        const segText = (segment.text || "").trim();
+        allText += `**[${startTime.toFixed(2)} → ${segEnd.toFixed(2)}]** ${segText}\n`;
+      }
+    } else {
+      allText = fullText;
+    }
+    return { content: allText.trim() };
   }
 
   // ============================================
@@ -478,22 +491,6 @@ export class CloudflareAdapter extends BaseAdapter {
     const response = await fetch(imageUrl);
     const buffer = await response.arrayBuffer();
     return Array.from(new Uint8Array(buffer));
-  }
-
-  private async dataUrlToUint8Array(dataUrl: string): Promise<Uint8Array> {
-    if (dataUrl.startsWith("data:")) {
-      const base64 = dataUrl.split(",")[1];
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes;
-    }
-
-    const response = await fetch(dataUrl);
-    const buffer = await response.arrayBuffer();
-    return new Uint8Array(buffer);
   }
 
   /**

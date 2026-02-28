@@ -4,7 +4,7 @@
  */
 "use client";
 
-import React, { memo, useState, useCallback, useRef } from "react";
+import React, { memo, useState, useCallback, useRef, useEffect } from "react";
 import { Message, MessageContentItem, SearchResults } from "@/types";
 import { cn, copyToClipboard, formatDate } from "@/lib/utils";
 import { Markdown } from "./markdown";
@@ -22,6 +22,10 @@ import {
   Play,
   Pause,
   Volume2,
+  Download,
+  X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -81,6 +85,166 @@ function pcmToWavDataUrl(rawDataUrl: string): string {
 }
 
 /**
+ * 通用下载函数：将 data URL 或 blob URL 下载为文件
+ */
+function downloadDataUrl(dataUrl: string, filename: string) {
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * 图片预览弹窗组件
+ * 支持放大、缩小、拖拽平移、双指缩放（移动端）、滚轮缩放（PC端）
+ */
+const ImagePreview = memo(function ImagePreview({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const posStart = useRef({ x: 0, y: 0 });
+  const lastPinchDist = useRef(0);
+
+  // ESC 关闭
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  // 滚轮缩放（PC）
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    setScale((prev) => Math.max(0.25, Math.min(5, prev - e.deltaY * 0.001)));
+  }, []);
+
+  // 鼠标拖拽
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    posStart.current = { ...position };
+  }, [position]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPosition({
+      x: posStart.current.x + (e.clientX - dragStart.current.x),
+      y: posStart.current.y + (e.clientY - dragStart.current.y),
+    });
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // 触摸拖拽 + 双指缩放（移动端）
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      posStart.current = { ...position };
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
+    }
+  }, [position]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      setPosition({
+        x: posStart.current.x + (e.touches[0].clientX - dragStart.current.x),
+        y: posStart.current.y + (e.touches[0].clientY - dragStart.current.y),
+      });
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (lastPinchDist.current > 0) {
+        const ratio = dist / lastPinchDist.current;
+        setScale((prev) => Math.max(0.25, Math.min(5, prev * ratio)));
+      }
+      lastPinchDist.current = dist;
+    }
+  }, []);
+
+  // 重置
+  const handleReset = useCallback(() => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* 工具栏 */}
+      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+        <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full" onClick={() => setScale((s) => Math.min(5, s + 0.25))}>
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+        <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full" onClick={() => setScale((s) => Math.max(0.25, s - 0.25))}>
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full" onClick={handleReset} title="重置">
+          <span className="text-xs font-bold">{Math.round(scale * 100)}%</span>
+        </Button>
+        <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full" onClick={() => downloadDataUrl(src, alt || `image_${Date.now()}.png`)}>
+          <Download className="h-4 w-4" />
+        </Button>
+        <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* 图片区域 */}
+      <div
+        className="w-full h-full flex items-center justify-center overflow-hidden select-none"
+        style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+      >
+        <img
+          src={src}
+          alt={alt}
+          className="max-w-none pointer-events-none"
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            transition: isDragging ? "none" : "transform 0.15s ease-out",
+          }}
+          draggable={false}
+        />
+      </div>
+    </div>
+  );
+});
+
+/**
  * 音频播放器组件
  * 展示播放按钮，点击播放/暂停音频
  * 支持 PCM L16 (Gemini TTS) 和常规音频
@@ -115,6 +279,11 @@ const AudioPlayer = memo(function AudioPlayer({
     }
   }, [url, isPlaying]);
 
+  const handleDownload = useCallback(() => {
+    const ext = mimeType.includes("wav") ? "wav" : mimeType.includes("mp3") ? "mp3" : "audio";
+    downloadDataUrl(url, `audio_${Date.now()}.${ext}`);
+  }, [url, mimeType]);
+
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
       <Button
@@ -133,6 +302,15 @@ const AudioPlayer = memo(function AudioPlayer({
         <Volume2 className="h-4 w-4" />
         <span>{isPlaying ? "Playing..." : "Audio"}</span>
       </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 ml-auto"
+        onClick={handleDownload}
+        title="下载音频"
+      >
+        <Download className="h-4 w-4" />
+      </Button>
     </div>
   );
 });
@@ -147,6 +325,8 @@ const MessageContent = memo(function MessageContent({
   content: MessageContentItem[];
   isUser: boolean;
 }) {
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
+
   return (
     <div className="space-y-2">
       {content.map((item, index) => {
@@ -162,13 +342,24 @@ const MessageContent = memo(function MessageContent({
 
           case "image":
             return (
-              <img
-                key={index}
-                src={item.url}
-                alt={item.fileName || "Image"}
-                className="max-w-full max-h-96 rounded-lg object-contain"
-                loading="lazy"
-              />
+              <div key={index} className="relative group inline-block">
+                <img
+                  src={item.url}
+                  alt={item.fileName || "Image"}
+                  className="max-w-full max-h-96 rounded-lg object-contain cursor-pointer"
+                  loading="lazy"
+                  onClick={() => setPreviewImage({ url: item.url || "", alt: item.fileName || "Image" })}
+                />
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                  onClick={(e) => { e.stopPropagation(); downloadDataUrl(item.url || "", item.fileName || `image_${Date.now()}.png`); }}
+                  title="下载图片"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
             );
 
           case "file":
@@ -206,6 +397,15 @@ const MessageContent = memo(function MessageContent({
             return null;
         }
       })}
+
+      {/* 图片预览弹窗 */}
+      {previewImage && (
+        <ImagePreview
+          src={previewImage.url}
+          alt={previewImage.alt}
+          onClose={() => setPreviewImage(null)}
+        />
+      )}
     </div>
   );
 });
