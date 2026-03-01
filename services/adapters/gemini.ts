@@ -348,6 +348,7 @@ export class GeminiAdapter extends BaseAdapter {
   }
 
   /**
+   * 暂未调试通过
    * 原生音频流（ASR/STT）
    * 支持语音转语音、语音转文字、或同时输出
    */
