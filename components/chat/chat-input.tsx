@@ -32,10 +32,24 @@ import {
   Square,
   Globe,
   AudioLines,
+  Mic,
 } from "lucide-react";
 import { ModelSelector } from "./model-selector";
 import { ToolSelector } from "./tool-selector";
 import type { Role, ModelConfig, ToolDefinition } from "@/types";
+
+/**
+ * 语音模式类型
+ */
+export type SpeechMode = "asr" | "stt" | "asr+stt";
+
+/**
+ * 语音能力选择状态
+ */
+export interface SpeechSelection {
+  asrEnabled: boolean;
+  sttEnabled: boolean;
+}
 
 /**
  * 附件类型
@@ -100,6 +114,12 @@ interface ChatInputProps {
   searchEnabled?: boolean;
   /** 切换联网搜索 */
   onToggleSearch?: () => void;
+  /** 语音能力选择状态 */
+  speechSelection?: SpeechSelection;
+  /** 切换 ASR 能力 */
+  onToggleAsr?: () => void;
+  /** 切换 STT 能力 */
+  onToggleStt?: () => void;
 }
 
 /**
@@ -116,6 +136,9 @@ const i18n = {
     zh: "输入消息... Enter 发送，Shift+Enter 换行",
     en: "Type a message... Enter to send, Shift+Enter for new line",
   },
+  asr: { zh: "语音转语音", en: "Speech to Speech" },
+  stt: { zh: "语音转文字", en: "Speech to Text" },
+  uploadAudio: { zh: "上传音频", en: "Upload Audio" },
 };
 
 /**
@@ -141,6 +164,9 @@ export const ChatInput = memo(function ChatInput({
   onStop,
   searchEnabled,
   onToggleSearch,
+  speechSelection = { asrEnabled: false, sttEnabled: false },
+  onToggleAsr,
+  onToggleStt,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -233,6 +259,37 @@ export const ChatInput = memo(function ChatInput({
   );
 
   const lang = useMemo(() => getLanguage(), []);
+
+  // 检查是否有音频文件附件
+  const hasAudioAttachment = useMemo(() => {
+    return attachments.some((a) => 
+      a.mimeType.startsWith("audio/") || 
+      [".mp3", ".wav", ".flac", ".ogg", ".m4a"].some(ext => a.name.toLowerCase().endsWith(ext))
+    );
+  }, [attachments]);
+
+  // 计算发送按钮是否禁用
+  const isSendDisabled = useMemo(() => {
+    // 正在加载时禁用
+    if (disabled) return true;
+    // 如果正在流式输出，显示停止按钮，不禁用
+    if (isLoading) return false;
+    
+    // 基本条件：有输入或有附件
+    const hasContent = input.trim() || attachments.length > 0;
+    if (!hasContent) return true;
+
+    // 如果模型同时支持 asr 和 stt
+    if (capabilities.asr && capabilities.stt) {
+      // 如果有音频文件，必须至少选择一个能力
+      if (hasAudioAttachment) {
+        const hasSelectedCapability = speechSelection.asrEnabled || speechSelection.sttEnabled;
+        if (!hasSelectedCapability) return true;
+      }
+    }
+    
+    return false;
+  }, [disabled, isLoading, input, attachments, capabilities, hasAudioAttachment, speechSelection]);
 
   // 处理文件上传
   const handleFileUpload = useCallback(
@@ -373,8 +430,46 @@ export const ChatInput = memo(function ChatInput({
           </>
         )}
 
-        {/* 上传音频（如果支持语音识别） */}
-        {capabilities.asr && (
+        {/* ASR 能力开关（如果支持） */}
+        {capabilities.asr && onToggleAsr && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={speechSelection.asrEnabled ? "default" : "ghost"}
+                  size="icon"
+                  onClick={onToggleAsr}
+                  disabled={disabled}
+                >
+                  <Mic className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{i18n.asr[lang]}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {/* STT 能力开关（如果支持） */}
+        {capabilities.stt && onToggleStt && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={speechSelection.sttEnabled ? "default" : "ghost"}
+                  size="icon"
+                  onClick={onToggleStt}
+                  disabled={disabled}
+                >
+                  <AudioLines className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{i18n.stt[lang]}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {/* 上传音频（如果支持语音识别 asr 或 stt） */}
+        {(capabilities.asr || capabilities.stt) && (
           <>
             <input
               ref={audioInputRef}
@@ -392,10 +487,10 @@ export const ChatInput = memo(function ChatInput({
                     onClick={() => audioInputRef.current?.click()}
                     disabled={disabled}
                   >
-                    <AudioLines className="h-5 w-5" />
+                    <FileUp className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>上传音频</TooltipContent>
+                <TooltipContent>{i18n.uploadAudio[lang]}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </>
@@ -554,7 +649,7 @@ export const ChatInput = memo(function ChatInput({
               e.preventDefault();
             }}
             onClick={isLoading ? onStop : handleSend}
-            disabled={(!input.trim() && attachments.length === 0 && !isLoading) || disabled}
+            disabled={isSendDisabled}
             className="h-[44px] px-4"
             variant={isLoading ? "destructive" : "default"}
           >

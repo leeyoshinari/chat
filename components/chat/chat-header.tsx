@@ -39,6 +39,10 @@ interface ChatHeaderProps {
   reasoningEnabled?: boolean;
   /** 是否启用联网搜索 */
   searchEnabled?: boolean;
+  /** ASR 是否启用 */
+  asrEnabled?: boolean;
+  /** STT 是否启用 */
+  sttEnabled?: boolean;
 }
 
 /**
@@ -46,12 +50,20 @@ interface ChatHeaderProps {
  */
 const i18n = {
   reasoning: {
-    zh: "推理模式",
-    en: "Reasoning",
+    zh: "思考模式",
+    en: "Thinking",
   },
   search: {
     zh: "联网搜索",
     en: "Web Search",
+  },
+  asr: {
+    zh: "语音转语音",
+    en: "Speech to Speech",
+  },
+  stt: {
+    zh: "语音转文字",
+    en: "Speech to Text",
   },
 };
 
@@ -68,6 +80,8 @@ export const ChatHeader = memo(function ChatHeader({
   providerIcon,
   reasoningEnabled,
   searchEnabled,
+  asrEnabled,
+  sttEnabled,
 }: ChatHeaderProps) {
   const lang = getLanguage();
   
@@ -117,6 +131,22 @@ export const ChatHeader = memo(function ChatHeader({
               <>
                 <span>·</span>
                 <span className="text-primary">{i18n.search[lang]}</span>
+              </>
+            )}
+
+            {/* ASR 语音转语音 */}
+            {asrEnabled && (
+              <>
+                <span>·</span>
+                <span className="text-primary">{i18n.asr[lang]}</span>
+              </>
+            )}
+
+            {/* STT 语音转文字 */}
+            {sttEnabled && (
+              <>
+                <span>·</span>
+                <span className="text-primary">{i18n.stt[lang]}</span>
               </>
             )}
 

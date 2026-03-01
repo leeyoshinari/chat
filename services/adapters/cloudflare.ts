@@ -1,11 +1,10 @@
 /**
  * Cloudflare Workers AI 适配器
- * 支持文生文(OpenAI兼容)、文生图、图生图、TTS、ASR
  *
  * Cloudflare Workers AI 的 baseUrl 格式:
  *   https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai
  *
- * 文生文走 OpenAI 兼容接口: {baseUrl}/v1/chat/completions
+ * 文生文走接口: {baseUrl}/v1/chat/completions
  * 其他能力走原生接口:       {baseUrl}/run/{model}
  */
 
@@ -16,10 +15,11 @@ import type { ModelCapabilities } from "@/types";
 /**
  * 根据模型能力标识判断模型类型
  */
-function detectModelType(capabilities?: ModelCapabilities): "chat" | "tts" | "asr" | "image" {
+function detectModelType(capabilities?: ModelCapabilities): "chat" | "tts" | "asr" | "stt" | "image" {
   if (!capabilities) return "chat";
   if (capabilities.tts) return "tts";
   if (capabilities.asr) return "asr";
+  if (capabilities.stt) return "stt";
   if (capabilities.imageOutput) return "image";
   return "chat";
 }
@@ -33,7 +33,6 @@ function normalizeBaseUrl(url: string): string {
 
 /**
  * 构建 Cloudflare Workers AI /run/ 端点 URL
- * 模型名如 @cf/meta/llama-3.1-8b-instruct，包含 @ 和 / 字符
  * Cloudflare 接受这些字符作为路径的一部分，无需编码
  */
 function buildRunUrl(baseUrl: string, model: string): string {
@@ -42,7 +41,7 @@ function buildRunUrl(baseUrl: string, model: string): string {
 }
 
 /**
- * 构建 OpenAI 兼容的 chat completions 端点 URL
+ * 构建 chat completions 端点 URL
  */
 function buildChatUrl(baseUrl: string): string {
   const base = normalizeBaseUrl(baseUrl);
@@ -59,7 +58,7 @@ export class CloudflareAdapter extends BaseAdapter {
     switch (modelType) {
       case "tts":
         return this.textToSpeech(request);
-      case "asr":
+      case "stt":
         return this.speechToText(request);
       case "image":
         return this.textToImage(request);
@@ -112,6 +111,7 @@ export class CloudflareAdapter extends BaseAdapter {
         tools: tools?.length ? tools : undefined,
         temperature: request.temperature ?? 0.7,
         max_tokens: request.maxTokens,
+        reasoning: "enabled",
         stream: true,
       }),
     });
@@ -345,7 +345,6 @@ export class CloudflareAdapter extends BaseAdapter {
       },
       body: JSON.stringify({
         prompt: text,
-        voice: "zh",
       }),
     });
 
@@ -366,7 +365,7 @@ export class CloudflareAdapter extends BaseAdapter {
   }
 
   // ============================================
-  // 语音转文字 (ASR)
+  // 语音转文字 (STT)
   // ============================================
 
   private async speechToText(request: AdapterRequest): Promise<AdapterResponse> {

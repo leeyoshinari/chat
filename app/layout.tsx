@@ -53,6 +53,8 @@ export default function RootLayout({
         {/* PWA 图标 */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body className={inter.className}>
         {/* 主题检测脚本 */}
@@ -72,26 +74,22 @@ export default function RootLayout({
             __html: `
               (function() {
                 if ('serviceWorker' in navigator) {
-                  window.addEventListener('load', function() {
-                    navigator.serviceWorker.register('/sw.js?v=${Date.now()}')
-                      .then(function(registration) {
-                        console.log('SW registered:', registration.scope);
-                        // 检查更新
-                        registration.addEventListener('updatefound', function() {
-                          const newWorker = registration.installing;
-                          if (newWorker) {
-                            newWorker.addEventListener('statechange', function() {
-                              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                // 新版本已安装，可以通知用户刷新
-                                console.log('New SW version available');
-                              }
-                            });
+                  window.addEventListener('load', async () => {
+                    try {
+                      const registration = await navigator.serviceWorker.register('/sw.js?v=${Date.now()}');
+                      registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        if (!newWorker) return;
+                        newWorker.addEventListener('statechange', () => {
+                          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('New SW version available');
+                            newWorker.postMessage('skipWaiting');
                           }
                         });
-                      })
-                      .catch(function(error) {
-                        console.log('SW registration failed:', error);
                       });
+                    } catch (error) {
+                      console.error('SW registration failed:', error);
+                    }
                   });
                 }
               })();

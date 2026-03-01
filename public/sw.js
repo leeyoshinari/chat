@@ -85,46 +85,44 @@ function shouldCache(request) {
   return false;
 }
 
-/**
- * 安装事件 - 缓存静态资源
- */
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker:', CACHE_NAME);
-  
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching static assets');
-      return cache.addAll(STATIC_ASSETS).catch((error) => {
+    (async () => {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        console.log('[SW] Caching static assets');
+        await cache.addAll(STATIC_ASSETS);
+      } catch (error) {
         console.warn('[SW] Failed to cache some assets:', error);
-      });
-    })
+      }
+      await self.skipWaiting();
+    })()
   );
-  
-  // 立即激活新的 Service Worker
-  self.skipWaiting();
 });
 
-/**
- * 激活事件 - 清理旧缓存
- */
+
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker:', CACHE_NAME);
-  
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name.startsWith('chat-cache-') && name !== CACHE_NAME)
-          .map((name) => {
-            console.log('[SW] Deleting old cache:', name);
-            return caches.delete(name);
-          })
-      );
-    })
+    (async () => {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames
+            .filter(name => name.startsWith('chat-cache-') && name !== CACHE_NAME)
+            .map(name => {
+              console.log('[SW] Deleting old cache:', name);
+              return caches.delete(name);
+            })
+        );
+        await self.clients.claim();
+        console.log('[SW] Activation complete');
+      } catch (error) {
+        console.error('[SW] Activation failed:', error);
+      }
+    })()
   );
-  
-  // 立即控制所有页面
-  self.clients.claim();
 });
 
 /**

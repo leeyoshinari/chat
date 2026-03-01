@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       maxTokens,
       password,
       search,
+      speechMode,
     } = body;
 
     // 验证密码
@@ -132,6 +133,7 @@ ${searchResults!.results
       temperature,
       maxTokens,
       capabilities: modelConfig?.capabilities,
+      speechMode,
     };
 
     // 流式响应

@@ -9,10 +9,10 @@ import { useChatStore } from "@/store/chat-store";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { MessageList } from "@/components/chat/message-list";
-import { ChatInput } from "@/components/chat/chat-input";
+import { ChatInput, SpeechMode, SpeechSelection } from "@/components/chat/chat-input";
 import { PasswordDialog } from "@/components/chat/password-dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { cn, generateId } from "@/lib/utils";
+import { cn, generateId, getLanguage } from "@/lib/utils";
 import type { Message, Role, ToolDefinition, ModelConfig } from "@/types";
 import { toast } from "sonner";
 
@@ -79,6 +79,7 @@ export default function HomePage() {
   const [isMobile, setIsMobile] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [speechSelection, setSpeechSelection] = useState<SpeechSelection>({ asrEnabled: false, sttEnabled: false });
   
   // AbortController 用于停止响应
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -291,6 +292,13 @@ export default function HomePage() {
             reasoning: reasoningEnabled,
             tools: enabledTools,
             search: searchEnabled,
+            speechMode: speechSelection.asrEnabled && speechSelection.sttEnabled 
+              ? "asr+stt" 
+              : speechSelection.asrEnabled 
+                ? "asr" 
+                : speechSelection.sttEnabled 
+                  ? "stt" 
+                  : undefined,
             password: useChatStore.getState().accessPassword,
           }),
           signal: abortController.signal,
@@ -420,6 +428,7 @@ export default function HomePage() {
       reasoningEnabled,
       enabledTools,
       searchEnabled,
+      speechSelection,
       addMessage,
       updateMessage,
       deleteMessage,
@@ -437,6 +446,16 @@ export default function HomePage() {
   // 切换联网搜索
   const handleToggleSearch = useCallback(() => {
     setSearchEnabled((prev) => !prev);
+  }, []);
+
+  // 切换 ASR 能力
+  const handleToggleAsr = useCallback(() => {
+    setSpeechSelection((prev) => ({ ...prev, asrEnabled: !prev.asrEnabled }));
+  }, []);
+
+  // 切换 STT 能力
+  const handleToggleStt = useCallback(() => {
+    setSpeechSelection((prev) => ({ ...prev, sttEnabled: !prev.sttEnabled }));
   }, []);
 
   // 重新生成消息
@@ -554,7 +573,7 @@ export default function HomePage() {
       <main className="flex-1 flex flex-col min-w-0">
         {/* 头部 */}
         <ChatHeader
-          title={currentSession?.title || "新对话"}
+          title={currentSession?.title || (getLanguage() === "zh" ? "新对话" : "New Chat")}
           modelName={currentModel?.name}
           providerIcon={currentProvider?.icon}
           toolNames={enabledTools.map(
@@ -565,6 +584,8 @@ export default function HomePage() {
           isMobile={isMobile}
           reasoningEnabled={reasoningEnabled}
           searchEnabled={searchEnabled}
+          asrEnabled={speechSelection.asrEnabled}
+          sttEnabled={speechSelection.sttEnabled}
         />
 
         {/* 消息列表 */}
@@ -596,6 +617,9 @@ export default function HomePage() {
           onStop={handleStop}
           searchEnabled={searchEnabled}
           onToggleSearch={currentModel?.capabilities?.search && config.webSearchEnabled ? handleToggleSearch : undefined}
+          speechSelection={speechSelection}
+          onToggleAsr={currentModel?.capabilities?.asr ? handleToggleAsr : undefined}
+          onToggleStt={currentModel?.capabilities?.stt ? handleToggleStt : undefined}
         />
       </main>
     </div>

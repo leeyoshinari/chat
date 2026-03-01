@@ -57,6 +57,9 @@ function parseCapabilities(capStr: string): ModelCapabilities {
       case "asr":
         caps.asr = true;
         break;
+      case "stt":
+        caps.stt = true;
+        break;
     }
   });
 

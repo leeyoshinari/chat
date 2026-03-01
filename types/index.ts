@@ -121,10 +121,12 @@ export interface ModelCapabilities {
   imageOutput?: boolean;
   /** 支持联网搜索 */
   search?: boolean;
-  /** 支持语音生成 */
+  /** 支持语音生成 (Text-to-Speech) */
   tts?: boolean;
-  /** 支持语音识别 */
+  /** 支持语音转语音 (Automatic Speech Recognition with audio output) */
   asr?: boolean;
+  /** 支持语音转文字 (Speech-to-Text) */
+  stt?: boolean;
 }
 
 /**
@@ -246,6 +248,11 @@ export interface Role {
 // ============================================
 
 /**
+ * 语音模式类型
+ */
+export type SpeechMode = "asr" | "stt" | "asr+stt";
+
+/**
  * 聊天请求
  */
 export interface ChatRequest {
@@ -270,6 +277,8 @@ export interface ChatRequest {
   maxTokens?: number;
   /** 访问密码 */
   password?: string;
+  /** 语音模式 */
+  speechMode?: SpeechMode;
 }
 
 /**

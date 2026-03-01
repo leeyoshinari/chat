@@ -9,6 +9,28 @@ import { toOpenAITools } from "@/config/tools";
 const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 /**
+ * 将 PCM 数据添加 WAV 头
+ * Gemini Native Audio 默认输出 24kHz, 16bit, 单声道 PCM
+ */
+function encodeWavHeader(pcmBuffer: Buffer, sampleRate: number = 24000): Buffer {
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + pcmBuffer.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM 格式
+  header.writeUInt16LE(1, 22); // 单声道
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28); // byteRate = sampleRate * channels * bitsPerSample/8
+  header.writeUInt16LE(2, 32); // blockAlign = channels * bitsPerSample/8
+  header.writeUInt16LE(16, 34); // bitsPerSample
+  header.write("data", 36);
+  header.writeUInt32LE(pcmBuffer.length, 40);
+  return Buffer.concat([header, pcmBuffer]);
+}
+
+/**
  * Google Gemini 适配器
  */
 export class GeminiAdapter extends BaseAdapter {
@@ -39,9 +61,38 @@ export class GeminiAdapter extends BaseAdapter {
     if (request.reasoning) {
       config.thinkingConfig = {
         includeThoughts: true,
-        thinkingBudget: 2048,
+        thinking_level: "HIGH",
       };
     }
+
+    return config;
+  }
+
+  /**
+   * 构建语音识别的 generationConfig
+   * 根据 speechMode 设置 responseModalities
+   */
+  private buildSpeechConfig(request: AdapterRequest) {
+    const config: Record<string, any> = {};
+    const speechMode = request.speechMode || "stt";
+
+    // 根据语音模式设置响应类型
+    if (speechMode === "asr") {
+      config.responseModalities = ["AUDIO"];
+    } else if (speechMode === "stt") {
+      config.responseModalities = ["TEXT"];
+    } else if (speechMode === "asr+stt") {
+      config.responseModalities = ["AUDIO", "TEXT"];
+    }
+
+    // 语音配置
+    config.speechConfig = {
+      voiceConfig: {
+        prebuiltVoiceConfig: {
+          voiceName: "Aoede",
+        },
+      },
+    };
 
     return config;
   }
@@ -51,6 +102,26 @@ export class GeminiAdapter extends BaseAdapter {
    */
   private isTTSModel(model: string): boolean {
     return model.toLowerCase().includes("tts");
+  }
+
+  /**
+   * 判断是否需要使用原生音频流（ASR/STT）
+   */
+  private needsNativeAudio(request: AdapterRequest): boolean {
+    const caps = request.capabilities;
+    if (!caps) return false;
+    return Boolean(caps.asr || caps.stt) && this.hasAudioInput(request);
+  }
+
+  /**
+   * 检查请求中是否包含音频输入
+   */
+  private hasAudioInput(request: AdapterRequest): boolean {
+    const lastMsg = request.messages[request.messages.length - 1];
+    if (typeof lastMsg.content === "string") return false;
+    return lastMsg.content.some(
+      (c) => c.type === "audio" || c.type === "file" && c.mimeType?.startsWith("audio/")
+    );
   }
 
   /**
@@ -153,7 +224,6 @@ export class GeminiAdapter extends BaseAdapter {
       if (part.inlineData?.data) {
         const rawMimeType = part.inlineData.mimeType || "";
         const isPCM = rawMimeType.includes("L16") || rawMimeType.includes("pcm");
-        // PCM 数据保留原始 data URL，前端会转为 WAV；mimeType 统一为 audio/wav
         const mimeType = isPCM ? "audio/wav" : (rawMimeType || "audio/wav");
         const audioDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         return {
@@ -162,7 +232,6 @@ export class GeminiAdapter extends BaseAdapter {
         };
       }
     }
-
     throw new Error("TTS response did not contain audio data");
   }
 
@@ -183,6 +252,12 @@ export class GeminiAdapter extends BaseAdapter {
         yield { type: "error", error: error instanceof Error ? error.message : "TTS failed" };
       }
       yield { type: "done" };
+      return;
+    }
+
+    // 原生音频流（ASR/STT）
+    if (this.needsNativeAudio(request)) {
+      yield* this.nativeAudioStream(request, baseUrl);
       return;
     }
 
@@ -236,7 +311,6 @@ export class GeminiAdapter extends BaseAdapter {
 
               for (const part of parts) {
                 if (part.thought === true && part.text) {
-                  // 思考内容：thought 是布尔标记，text 是实际内容
                   yield { type: "thinking", content: part.text };
                 } else if (part.text) {
                   yield { type: "text", content: part.text };
@@ -274,6 +348,134 @@ export class GeminiAdapter extends BaseAdapter {
   }
 
   /**
+   * 原生音频流（ASR/STT）
+   * 支持语音转语音、语音转文字、或同时输出
+   */
+  private async *nativeAudioStream(
+    request: AdapterRequest,
+    baseUrl: string
+  ): AsyncGenerator<StreamChunk> {
+    const url = `${baseUrl}/models/${request.model}:streamGenerateContent?alt=sse&key=${request.apiKey}`;
+    const lastMsg = request.messages[request.messages.length - 1];
+
+    // 构建请求内容
+    const parts: any[] = [];
+    if (typeof lastMsg.content === "string") {
+      parts.push({ text: lastMsg.content });
+    } else {
+      for (const c of lastMsg.content) {
+        if (c.type === "text") {
+          parts.push({ text: c.text });
+        } else if ((c.type === "audio" || c.type === "file") && c.url) {
+          // 提取音频数据
+          let mimeType = c.mimeType || "audio/wav";
+          let data = "";
+          if (c.url.startsWith("data:")) {
+            const [meta, b64] = c.url.split(",");
+            const match = meta.match(/data:(.*?);/);
+            mimeType = match ? match[1] : mimeType;
+            data = b64;
+          }
+          if (data) {
+            parts.push({ inlineData: { mimeType, data } });
+          }
+        }
+      }
+    }
+
+    const payload = {
+      contents: [{ parts }],
+      generationConfig: this.buildSpeechConfig(request),
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      yield { type: "error", error: `Native Audio API Error: ${response.status} - ${error}` };
+      return;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      yield { type: "error", error: "No response body" };
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const pcmChunks: Buffer[] = [];
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              const resParts = parsed.candidates?.[0]?.content?.parts || [];
+
+              for (const part of resParts) {
+                // 文字流：立即返回给前端 (STT)
+                if (part.text) {
+                  yield { type: "text", content: part.text };
+                }
+
+                // 语音流：暂存在内存中，不立即发送
+                if (part.inlineData?.data) {
+                  const b64Data = part.inlineData.data;
+                  pcmChunks.push(Buffer.from(b64Data, "base64"));
+                }
+
+                // 工具调用处理
+                if (part.functionCall) {
+                  yield {
+                    type: "tool_call",
+                    toolCall: {
+                      id: crypto.randomUUID(),
+                      name: part.functionCall.name,
+                      arguments: part.functionCall.args,
+                    },
+                  };
+                }
+              }
+            } catch {
+              // 忽略解析错误
+            }
+          }
+        }
+      }
+
+      // 所有流结束后，合并 PCM 并添加 WAV 头一次性返回
+      if (pcmChunks.length > 0) {
+        const fullPcmBuffer = Buffer.concat(pcmChunks);
+        // Gemini Native Audio 默认输出 24kHz, 16bit, 单声道 PCM
+        const wavBuffer = encodeWavHeader(fullPcmBuffer, 24000);
+
+        yield {
+          type: "audio",
+          content: wavBuffer.toString("base64"),
+          mimeType: "audio/wav",
+        };
+      }
+    } finally {
+      reader?.releaseLock();
+    }
+
+    yield { type: "done" };
+  }
+
+  /**
    * 格式化消息
    */
   private formatMessages(request: AdapterRequest) {
@@ -301,6 +503,13 @@ export class GeminiAdapter extends BaseAdapter {
               fileData: { fileUri: item.url },
             });
           }
+        } else if ((item.type === "audio" || item.type === "file") && item.url?.startsWith("data:")) {
+          // 支持 base64 音频
+          const [meta, data] = item.url.split(",");
+          const mimeType = meta.match(/data:(.*);/)?.[1] || item.mimeType || "audio/wav";
+          parts.push({
+            inlineData: { mimeType, data },
+          });
         }
       }
 

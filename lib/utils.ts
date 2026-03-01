@@ -141,6 +141,15 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 /**
+ * 获取当前语言
+ */
+export function getLanguage(): "zh" | "en" {
+  if (typeof window === "undefined") return "zh";
+  const lang = navigator.language.toLowerCase();
+  return lang.startsWith("zh") ? "zh" : "en";
+}
+
+/**
  * 文件大小格式化
  */
 export function formatFileSize(bytes: number): string {

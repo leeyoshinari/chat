@@ -195,11 +195,11 @@ const ImagePreview = memo(function ImagePreview({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-50 flex flex-col bg-black/80"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* 工具栏 */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+      {/* 工具栏 - 顶部居中，手机友好 */}
+      <div className="flex items-center justify-center gap-2 p-3 z-10 flex-shrink-0">
         <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full" onClick={() => setScale((s) => Math.min(5, s + 0.25))}>
           <ZoomIn className="h-4 w-4" />
         </Button>
@@ -217,9 +217,9 @@ const ImagePreview = memo(function ImagePreview({
         </Button>
       </div>
 
-      {/* 图片区域 */}
+      {/* 图片区域 - 填充剩余空间 */}
       <div
-        className="w-full h-full flex items-center justify-center overflow-hidden select-none"
+        className="flex-1 flex items-center justify-center overflow-hidden select-none min-h-0"
         style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -232,7 +232,7 @@ const ImagePreview = memo(function ImagePreview({
         <img
           src={src}
           alt={alt}
-          className="max-w-none pointer-events-none"
+          className="max-w-[90vw] max-h-[80vh] object-contain pointer-events-none"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             transition: isDragging ? "none" : "transform 0.15s ease-out",

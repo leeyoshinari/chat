@@ -1,14 +1,11 @@
 /**
- * OpenAI 兼容适配器
+ * DeepSeek 适配器
  */
 
 import { BaseAdapter, AdapterRequest, AdapterResponse, StreamChunk } from "./base";
 import { toOpenAITools } from "@/config/tools";
 
-/**
- * OpenAI 兼容适配器
- */
-export class OpenAIAdapter extends BaseAdapter {
+export class DeepSeekAdapter extends BaseAdapter {
   /**
    * 非流式对话
    */
@@ -25,7 +22,7 @@ export class OpenAIAdapter extends BaseAdapter {
     };
 
     if (request.reasoning) {
-      body.reasoning = { effort: "high" };
+      body.reasoning_effort = "high";
     }
 
     const response = await fetch(`${request.baseUrl}/chat/completions`, {
@@ -81,7 +78,7 @@ export class OpenAIAdapter extends BaseAdapter {
     };
 
     if (request.reasoning) {
-      body.reasoning = { effort: "high" };
+      body.reasoning_effort = "high";
     }
 
     const response = await fetch(`${request.baseUrl}/chat/completions`, {
@@ -185,6 +182,7 @@ export class OpenAIAdapter extends BaseAdapter {
           });
         }
       }
+
       return { role: msg.role, content };
     });
   }

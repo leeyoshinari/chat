@@ -26,7 +26,7 @@
  * ```
  */
 
-import { MessageContentItem, ModelCapabilities, ToolCall, ToolDefinition } from "@/types";
+import { MessageContentItem, ModelCapabilities, ToolCall, ToolDefinition, SpeechMode } from "@/types";
 
 /**
  * 适配器请求
@@ -53,6 +53,8 @@ export interface AdapterRequest {
   temperature?: number;
   /** 最大输出 token */
   maxTokens?: number;
+  /** 语音模式：asr（语音转语音）、stt（语音转文字）、asr+stt（同时） */
+  speechMode?: SpeechMode;
 }
 
 /**

@@ -7,6 +7,7 @@
 import { BaseTool, ToolResult } from "./base";
 import { extractReadableContent } from "./readability-lite";
 import { smartTruncate } from "./smartTruncate";
+import { extractSearchKeywords } from "./keyword-extractor";
 
 /**
  * 搜索结果项
@@ -41,12 +42,12 @@ export class WebSearchTool extends BaseTool {
     const searchType = process.env.SEARCH_API_TYPE || "serper";
 
     try {
+      const keywords = await extractSearchKeywords(query);
       let results: SearchResult[];
-
       if (searchType === "google") {
-        results = await this.googleSearch(query, numResults);
+        results = await this.googleSearch(keywords, numResults);
       } else {
-        results = await this.serperSearch(query, numResults);
+        results = await this.serperSearch(keywords, numResults);
       }
 
       // 并发抓取所有搜索结果页面的内容
@@ -55,7 +56,8 @@ export class WebSearchTool extends BaseTool {
       return {
         success: true,
         data: {
-          query,
+          query: keywords, // 返回提取后的关键词
+          originalQuery: query, // 保留原始查询
           results,
           resultCount: results.length,
         },
