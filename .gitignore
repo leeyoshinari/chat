@@ -37,3 +37,4 @@ DEVELOPMENT.md
 *.tsbuildinfo
 next-env.d.ts
 workbox*.js
+sw.js
