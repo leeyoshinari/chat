@@ -310,7 +310,7 @@ const SessionItem = memo(function SessionItem({
     >
       <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
       <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="text-sm font-medium truncate max-w-[160px]" title={session.title}>
+        <div className="text-sm font-medium truncate max-w-[80vh]" title={session.title}>
           {session.title}
         </div>
         <div className="text-xs text-muted-foreground">
@@ -324,7 +324,7 @@ const SessionItem = memo(function SessionItem({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="flex-shrink-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
             <MoreHorizontal className="h-4 w-4" />

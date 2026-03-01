@@ -235,9 +235,9 @@ export default function HomePage() {
         model: selectedModelId,
       });
 
-      // 如果是第一条消息，使用用户输入的前15个字作为标题
+      // 如果是第一条消息，使用用户输入的前20个字作为标题
       if ((userMessage as any).needsTitle && content) {
-        const title = content.length > 15 ? content.slice(0, 15) + "..." : content;
+        const title = content.length > 20 ? content.slice(0, 20) + "..." : content;
         renameSession(userMessage.sessionId, title);
       }
 

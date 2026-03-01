@@ -231,3 +231,6 @@
     padding-top: env(safe-area-inset-top);
   }
 }
+div[data-radix-scroll-area-viewport] > div {
+  display: block !important;
+}
