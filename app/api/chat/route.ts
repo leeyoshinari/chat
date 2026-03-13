@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         const searchTool = new WebSearchTool();
         const searchResult = await searchTool.execute({
           query: userQuery,
-          num_results: 5,
+          num_results: 8,
         });
 
         if (searchResult.success && searchResult.data) {

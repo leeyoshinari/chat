@@ -207,7 +207,7 @@ export default function HomePage() {
 
   // 发送消息
   const handleSend = useCallback(
-    async (content: string, attachments: any[]) => {
+    async (content: string, attachments: any[], options?: { regenerate?: boolean }) => {
       if (!selectedModelId || !selectedProviderId) {
         toast.error("请先选择模型");
         return;
@@ -228,12 +228,17 @@ export default function HomePage() {
       }
 
       // 添加用户消息
-      const userMessage = await addMessage({
-        sessionId: currentSessionId || "",
-        role: "user",
-        content: userContent,
-        model: selectedModelId,
-      });
+      let userMessage;
+      if (!options?.regenerate) {
+        userMessage = await addMessage({
+          sessionId: currentSessionId || "",
+          role: "user",
+          content: userContent,
+          model: selectedModelId,
+        });
+      } else {
+        userMessage = messages[messages.length - 1];
+      }
 
       // 如果是第一条消息，使用用户输入的前20个字作为标题
       if ((userMessage as any).needsTitle && content) {
@@ -495,7 +500,7 @@ export default function HomePage() {
           mimeType: c.mimeType || "",
         }));
 
-      handleSend(textContent, attachments);
+      handleSend(textContent, attachments, { regenerate: true });
     },
     [messages, regenerateMessage, handleSend]
   );

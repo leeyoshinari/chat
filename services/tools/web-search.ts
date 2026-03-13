@@ -33,7 +33,7 @@ export class WebSearchTool extends BaseTool {
    */
   async execute(args: Record<string, unknown>): Promise<ToolResult> {
     const query = args.query as string;
-    const numResults = (args.num_results as number) || 5;
+    const numResults = (args.num_results as number) || 8;
 
     if (!query) {
       return { success: false, error: "Missing query parameter" };
