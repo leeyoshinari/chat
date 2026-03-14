@@ -162,11 +162,11 @@ export const Markdown = memo(function Markdown({
             );
           },
           // 列表
-          ul({ children }) {
-            return <ul className="list-disc pl-6 my-2">{children}</ul>;
+          ul({ node, children, ...rest }: any) {
+            return <ul className="list-disc pl-6 my-2" {...rest}>{children}</ul>;
           },
-          ol({ children }) {
-            return <ol className="list-decimal pl-6 my-2">{children}</ol>;
+          ol({ node, children, ...rest }: any) {
+            return <ol className="list-decimal pl-6 my-2" {...rest}>{children}</ol>;
           },
           // 标题
           h1({ children }) {
