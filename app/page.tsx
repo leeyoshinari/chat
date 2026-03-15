@@ -17,6 +17,29 @@ import type { Message, Role, ToolDefinition, ModelConfig } from "@/types";
 import { toast } from "sonner";
 
 /**
+ * 更新 URL 中的 sessionId（不刷新页面）
+ */
+function updateUrlSessionId(sessionId: string | null) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (sessionId) {
+    url.searchParams.set("session", sessionId);
+  } else {
+    url.searchParams.delete("session");
+  }
+  window.history.replaceState({}, "", url.toString());
+}
+
+/**
+ * 从 URL 中读取 sessionId
+ */
+function getUrlSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  const url = new URL(window.location.href);
+  return url.searchParams.get("session");
+}
+
+/**
  * 提供商分组
  */
 interface ProviderGroup {
@@ -135,6 +158,22 @@ export default function HomePage() {
         // 加载会话
         await loadSessions();
 
+        // 从 URL 恢复会话
+        const urlSessionId = getUrlSessionId();
+        if (urlSessionId) {
+          const allSessions = useChatStore.getState().sessions;
+          const targetSession = allSessions.find((s) => s.id === urlSessionId);
+          if (targetSession) {
+            await switchSession(urlSessionId);
+          } else {
+            // URL 中的 sessionId 不存在，清除
+            updateUrlSessionId(null);
+          }
+        } else if (useChatStore.getState().currentSessionId) {
+          // 如果有当前会话但 URL 没有，同步到 URL
+          updateUrlSessionId(useChatStore.getState().currentSessionId);
+        }
+
         // 设置默认模型（只有当没有保存的模型时才设置）
         const persistedState = useChatStore.getState();
         if (!persistedState.selectedModelId && configData.providers.length > 0) {
@@ -244,6 +283,8 @@ export default function HomePage() {
       if ((userMessage as any).needsTitle && content) {
         const title = content.length > 20 ? content.slice(0, 20) + "..." : content;
         renameSession(userMessage.sessionId, title);
+        // 首条消息创建了新会话，将 sessionId 同步到 URL
+        updateUrlSessionId(userMessage.sessionId);
       }
 
       // 添加 AI 响应消息占位
@@ -505,13 +546,35 @@ export default function HomePage() {
     [messages, regenerateMessage, handleSend]
   );
 
+  // 包装 switchSession，同时更新 URL
+  const handleSwitchSession = useCallback(async (sessionId: string) => {
+    await switchSession(sessionId);
+    updateUrlSessionId(sessionId);
+  }, [switchSession]);
+
+  // 包装 deleteSession，删除后同步 URL
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    await deleteSession(sessionId);
+    // 删除后，同步当前会话 ID 到 URL
+    const newCurrentId = useChatStore.getState().currentSessionId;
+    updateUrlSessionId(newCurrentId);
+  }, [deleteSession]);
+
   // 处理新建对话
   const handleNewChat = useCallback(async () => {
     await createSession();
+    // 新建对话时清除 URL 中的 sessionId（新对话还没有消息，不需要 URL 定位）
+    updateUrlSessionId(null);
     if (isMobile) {
       setSidebarOpen(false);
     }
   }, [createSession, isMobile, setSidebarOpen]);
+
+  // 包装 clearCurrentSession，清除后同步 URL
+  const handleClearCurrentSession = useCallback(async () => {
+    await clearCurrentSession();
+    updateUrlSessionId(null);
+  }, [clearCurrentSession]);
 
   // 处理选择角色 - 返回 systemPrompt 给输入框填充
   const handleSelectRole = useCallback(
@@ -549,8 +612,8 @@ export default function HomePage() {
           <Sidebar
             sessions={sessions}
             currentSessionId={currentSessionId}
-            onSelectSession={switchSession}
-            onDeleteSession={deleteSession}
+            onSelectSession={handleSwitchSession}
+            onDeleteSession={handleDeleteSession}
             onRenameSession={renameSession}
             onNewSession={handleNewChat}
           />
@@ -564,8 +627,8 @@ export default function HomePage() {
             <Sidebar
               sessions={sessions}
               currentSessionId={currentSessionId}
-              onSelectSession={switchSession}
-              onDeleteSession={deleteSession}
+              onSelectSession={handleSwitchSession}
+              onDeleteSession={handleDeleteSession}
               onRenameSession={renameSession}
               onNewSession={handleNewChat}
               onClose={() => setSidebarOpen(false)}
@@ -614,7 +677,7 @@ export default function HomePage() {
           onToggleTool={toggleTool}
           reasoningEnabled={reasoningEnabled}
           onToggleReasoning={toggleReasoning}
-          onClearHistory={clearCurrentSession}
+          onClearHistory={handleClearCurrentSession}
           onNewChat={handleNewChat}
           roles={roles}
           onSelectRole={handleSelectRole}
