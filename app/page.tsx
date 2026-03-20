@@ -77,7 +77,7 @@ export default function HomePage() {
     isAuthenticated,
     sidebarOpen,
     loadSessions,
-    createSession,
+    ensureSession,
     switchSession,
     deleteSession,
     renameSession,
@@ -166,12 +166,15 @@ export default function HomePage() {
           if (targetSession) {
             await switchSession(urlSessionId);
           } else {
-            // URL 中的 sessionId 不存在，清除
+            // URL 中的 sessionId 不存在，清除后走正常初始化逻辑
             updateUrlSessionId(null);
+            const activeId = await ensureSession();
+            updateUrlSessionId(activeId);
           }
-        } else if (useChatStore.getState().currentSessionId) {
-          // 如果有当前会话但 URL 没有，同步到 URL
-          updateUrlSessionId(useChatStore.getState().currentSessionId);
+        } else {
+          // 无 URL 参数：复用空会话或创建新会话
+          const activeId = await ensureSession();
+          updateUrlSessionId(activeId);
         }
 
         // 设置默认模型（只有当没有保存的模型时才设置）
@@ -560,21 +563,21 @@ export default function HomePage() {
     updateUrlSessionId(newCurrentId);
   }, [deleteSession]);
 
-  // 处理新建对话
+  // 处理新建对话：复用空会话或创建新会话
   const handleNewChat = useCallback(async () => {
-    await createSession();
-    // 新建对话时清除 URL 中的 sessionId（新对话还没有消息，不需要 URL 定位）
-    updateUrlSessionId(null);
+    const activeId = await ensureSession();
+    updateUrlSessionId(activeId);
     if (isMobile) {
       setSidebarOpen(false);
     }
-  }, [createSession, isMobile, setSidebarOpen]);
+  }, [ensureSession, isMobile, setSidebarOpen]);
 
   // 包装 clearCurrentSession，清除后同步 URL
   const handleClearCurrentSession = useCallback(async () => {
     await clearCurrentSession();
-    updateUrlSessionId(null);
-  }, [clearCurrentSession]);
+    const activeId = await ensureSession();
+    updateUrlSessionId(activeId);
+  }, [clearCurrentSession, ensureSession]);
 
   // 处理选择角色 - 返回 systemPrompt 给输入框填充
   const handleSelectRole = useCallback(

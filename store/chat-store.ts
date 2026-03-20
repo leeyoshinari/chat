@@ -49,6 +49,8 @@ interface ChatStore {
   
   /** 创建新会话 */
   createSession: () => Promise<string>;
+  /** 确保存在可用会话：若最新会话为空则复用，否则创建新会话 */
+  ensureSession: () => Promise<string>;
   /** 切换会话 */
   switchSession: (sessionId: string) => Promise<void>;
   /** 删除会话 */
@@ -137,19 +139,11 @@ export const useChatStore = create<ChatStore>()(
       // ============================================
 
       createSession: async () => {
-        const { selectedModelId, currentRoleId, enabledTools, sessions, messages, currentSessionId } = get();
-        
-        // 防止重复创建空会话
-        if (currentSessionId) {
-          const currentSession = sessions.find((s) => s.id === currentSessionId);
-          if (currentSession && messages.length === 0 && currentSession.title === "New Chat") {
-            return currentSessionId;
-          }
-        }
-        
+        const { selectedModelId, currentRoleId, enabledTools } = get();
+
         const id = generateId();
         const now = Date.now();
-        
+
         const session: Session = {
           id,
           title: "New Chat",
@@ -161,7 +155,7 @@ export const useChatStore = create<ChatStore>()(
         };
 
         await db.createSession(session);
-        
+
         set((state) => ({
           sessions: [session, ...state.sessions],
           currentSessionId: id,
@@ -171,6 +165,34 @@ export const useChatStore = create<ChatStore>()(
         }));
 
         return id;
+      },
+
+      ensureSession: async () => {
+        const { sessions, currentSessionId, messages } = get();
+
+        // 1. 当前会话已经是空的，直接复用
+        if (currentSessionId && messages.length === 0) {
+          return currentSessionId;
+        }
+
+        // 2. 检查最新一条历史会话是否为空（sessions 按时间倒序，[0] 是最新的）
+        if (sessions.length > 0) {
+          const latestSession = sessions[0];
+          const msgs = await db.getMessagesBySession(latestSession.id);
+          if (msgs.length === 0) {
+            // 最新会话是空的，切换到它
+            set({
+              currentSessionId: latestSession.id,
+              messages: [],
+              currentRoleId: null,
+              currentRolePrompt: null,
+            });
+            return latestSession.id;
+          }
+        }
+
+        // 3. 没有空会话可复用，创建新会话
+        return await get().createSession();
       },
 
       switchSession: async (sessionId) => {
