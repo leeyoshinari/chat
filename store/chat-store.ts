@@ -247,10 +247,7 @@ export const useChatStore = create<ChatStore>()(
           // 删除当前会话
           await db.deleteSession(currentSessionId);
           const newSessions = sessions.filter((s) => s.id !== currentSessionId);
-          set({ sessions: newSessions });
-          
-          // 创建新会话
-          await get().createSession();
+          set({ sessions: newSessions, currentSessionId: null, messages: [] });
         }
       },
 

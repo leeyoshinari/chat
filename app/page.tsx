@@ -555,13 +555,13 @@ export default function HomePage() {
     updateUrlSessionId(sessionId);
   }, [switchSession]);
 
-  // 包装 deleteSession，删除后同步 URL
+  // 包装 deleteSession，删除后确保有可用会话
   const handleDeleteSession = useCallback(async (sessionId: string) => {
     await deleteSession(sessionId);
-    // 删除后，同步当前会话 ID 到 URL
-    const newCurrentId = useChatStore.getState().currentSessionId;
-    updateUrlSessionId(newCurrentId);
-  }, [deleteSession]);
+    // 删除后，确保有可用会话（复用空会话或创建新会话）
+    const activeId = await ensureSession();
+    updateUrlSessionId(activeId);
+  }, [deleteSession, ensureSession]);
 
   // 处理新建对话：复用空会话或创建新会话
   const handleNewChat = useCallback(async () => {
