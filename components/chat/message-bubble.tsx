@@ -622,14 +622,17 @@ export const MessageBubble = memo(function MessageBubble({
       {/* 消息内容 */}
       <div
         className={cn(
-          "flex flex-col max-w-[85vw]",
+          "flex flex-col min-w-0",
+          isUser
+            ? "max-w-[85%] sm:max-w-[75%]"
+            : "flex-1 sm:max-w-[85%]",
           isUser ? "items-end" : "items-start"
         )}
       >
         {/* 消息气泡 */}
-        <div style={{ width: isUser ? "" : "85vw" }}
+        <div
           className={cn(
-            "rounded-2xl px-4 py-3",
+            "rounded-2xl px-4 py-3 w-full",
             isUser
               ? "bg-user-message text-user-message-foreground"
               : "bg-assistant-message text-assistant-message-foreground"

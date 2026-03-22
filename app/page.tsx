@@ -107,14 +107,23 @@ export default function HomePage() {
   // AbortController 用于停止响应
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // 检测移动端
+  // 检测是否使用移动端布局：手机 + pad 竖屏 → 移动端布局；桌面 + pad 横屏 → 桌面布局
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    const checkLayout = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const isPortrait = height > width; // 竖屏
+      // 手机（<= 768）始终为移动端；pad（769~1199）竖屏时为移动端
+      const mobile = width <= 768 || (width <= 1199 && isPortrait);
+      setIsMobile(mobile);
     };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    checkLayout();
+    window.addEventListener("resize", checkLayout);
+    window.addEventListener("orientationchange", checkLayout);
+    return () => {
+      window.removeEventListener("resize", checkLayout);
+      window.removeEventListener("orientationchange", checkLayout);
+    };
   }, []);
 
   // 加载配置和会话
