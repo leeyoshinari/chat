@@ -7,6 +7,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-size: 100%;
+  }
   /* 亮色主题变量 */
   :root {
     /* 基础颜色 */
