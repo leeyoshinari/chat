@@ -21,6 +21,7 @@ import { CloudflareAdapter } from "./cloudflare";
 const ADAPTERS: Record<string, new () => BaseAdapter> = {
   // OpenAI
   openai: OpenAIAdapter,
+  nvidia: OpenAIAdapter,
   
   // DeepSeek
   deepseek: DeepSeekAdapter,

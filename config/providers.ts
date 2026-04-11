@@ -147,6 +147,12 @@ const PROVIDER_CONFIGS: ProviderEnvConfig[] = [
     icon: "/icons/cloudflare.svg",
     envPrefix: "CLOUDFLARE",
   },
+  {
+    id: "nvidia",
+    name: "NVIDIA",
+    icon: "/icons/nvidia.ico",
+    envPrefix: "NVIDIA",
+  }
 ];
 
 /**
