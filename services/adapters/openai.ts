@@ -81,7 +81,15 @@ export class OpenAIAdapter extends BaseAdapter {
     };
 
     if (request.reasoning) {
-      body.reasoning = { effort: "high" };
+      if (request.model.startsWith('qwen')) {
+        body.enable_thinking = true;
+      } else {
+        body.reasoning = { effort: "high" };
+      }
+    } else {
+      if (request.model.startsWith('qwen')) {
+        body.enable_thinking = false;
+      }
     }
 
     const response = await fetch(`${request.baseUrl}/chat/completions`, {

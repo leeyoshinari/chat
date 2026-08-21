@@ -22,6 +22,7 @@ const ADAPTERS: Record<string, new () => BaseAdapter> = {
   // OpenAI
   openai: OpenAIAdapter,
   nvidia: OpenAIAdapter,
+  qwen: OpenAIAdapter,
   
   // DeepSeek
   deepseek: DeepSeekAdapter,
